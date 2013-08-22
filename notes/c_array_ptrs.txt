@@ -1,0 +1,349 @@
+ASCII Art Rules!
+
+Let's look at a 2D array pictorially. Let's assume that the array is of 2-byte short integers, and that the addresses are conveniently 2-bytes too. This could be a Zilog Z80 chip, if you like, but it is only for convenience of keeping the numbers small.
+
+short A[3][3];
+
++---------+---------+---------+
+| A[0][0] | A[0][1] | A[0][2] |
++---------+---------+---------+
+| A[1][0] | A[1][1] | A[1][2] |
++---------+---------+---------+
+| A[2][0] | A[2][1] | A[2][2] |
++---------+---------+---------+
+
+Let's assume the address: A = 0x4000. The short * addresses of the elements of the array, then, are:
+
+&A[0][0] = 0x4000;
+&A[0][1] = 0x4002;
+&A[0][2] = 0x4004;
+&A[1][0] = 0x4006;
+&A[1][1] = 0x4008;
+&A[1][2] = 0x400A;
+&A[2][0] = 0x400C;
+&A[2][1] = 0x400E;
+&A[2][2] = 0x4010;
+
+Now, it should also be observed that you can write:
+
+&A[0]    = 0x4000;
+&A[1]    = 0x4006;
+&A[2]    = 0x400C;
+
+The types of these pointers is 'pointer to array[3] of short', or short (*A)[3].
+
+You can also write:
+
+&A       = 0x4000;
+
+The type of this is 'pointer to array[3][3] of short', or short (*A)[3][3].
+
+One of the key differences is in the sizes of the object, as this code demonstrates:
+
+#include <stdio.h>
+#include <inttypes.h>
+
+static void print_address(const char *tag, uintptr_t address, size_t size);
+
+int main(void)
+{
+    char  buffer[32];
+    short A[3][3] = { { 0, 1, 2 }, { 3, 4, 5 }, { 6, 7, 8 } };
+    int i, j;
+
+    print_address("A",  (uintptr_t)A,  sizeof(A));
+    print_address("&A", (uintptr_t)&A, sizeof(*(&A)));
+
+    for (i = 0; i < 3; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+            sprintf(buffer, "&A[%d][%d]", i, j);
+            print_address(buffer, (uintptr_t)&A[i][j], sizeof(*(&A[i][j])));
+        }
+    }
+
+    for (i = 0; i < 3; i++)
+    {
+        sprintf(buffer, "&A[%d]", i);
+        print_address(buffer, (uintptr_t)&A[i], sizeof(*(&A[i])));
+    }
+
+    putchar('\n');
+    for (i = 0; i < 3; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+            printf("  A[%d][%d] = %d", i, j, A[i][j]);
+        }
+        putchar('\n');
+    }
+
+    return 0;
+}
+
+static void print_address(const char *tag, uintptr_t address, size_t size)
+{
+    printf("%-8s  = 0x%.4" PRIXPTR " (size %zu)\n", tag, address & 0xFFFF, size);
+}
+
+This program fakes 16-bit addresses with the masking operation in the print_address() function.
+
+The output when compiled in 64-bit mode on MacOS X 10.7.2 (GCC 'i686-apple-darwin11-llvm-gcc-4.2 (GCC) 4.2.1 (Based on Apple Inc. build 5658) (LLVM build 2335.15.00)'), was:
+
+A         = 0xD5C0 (size 18)
+&A        = 0xD5C0 (size 18)
+&A[0][0]  = 0xD5C0 (size 2)
+&A[0][1]  = 0xD5C2 (size 2)
+&A[0][2]  = 0xD5C4 (size 2)
+&A[1][0]  = 0xD5C6 (size 2)
+&A[1][1]  = 0xD5C8 (size 2)
+&A[1][2]  = 0xD5CA (size 2)
+&A[2][0]  = 0xD5CC (size 2)
+&A[2][1]  = 0xD5CE (size 2)
+&A[2][2]  = 0xD5D0 (size 2)
+&A[0]     = 0xD5C0 (size 6)
+&A[1]     = 0xD5C6 (size 6)
+&A[2]     = 0xD5CC (size 6)
+
+  A[0][0] = 0  A[0][1] = 1  A[0][2] = 2
+  A[1][0] = 3  A[1][1] = 4  A[1][2] = 5
+  A[2][0] = 6  A[2][1] = 7  A[2][2] = 8
+
+I compiled a variant without the masking operation in 32-bit mode, and got the output:
+
+A         = 0xC00E06D0 (size 18)
+&A        = 0xC00E06D0 (size 18)
+&A[0][0]  = 0xC00E06D0 (size 2)
+&A[0][1]  = 0xC00E06D2 (size 2)
+&A[0][2]  = 0xC00E06D4 (size 2)
+&A[1][0]  = 0xC00E06D6 (size 2)
+&A[1][1]  = 0xC00E06D8 (size 2)
+&A[1][2]  = 0xC00E06DA (size 2)
+&A[2][0]  = 0xC00E06DC (size 2)
+&A[2][1]  = 0xC00E06DE (size 2)
+&A[2][2]  = 0xC00E06E0 (size 2)
+&A[0]     = 0xC00E06D0 (size 6)
+&A[1]     = 0xC00E06D6 (size 6)
+&A[2]     = 0xC00E06DC (size 6)
+
+  A[0][0] = 0  A[0][1] = 1  A[0][2] = 2
+  A[1][0] = 3  A[1][1] = 4  A[1][2] = 5
+  A[2][0] = 6  A[2][1] = 7  A[2][2] = 8
+
+And in 64-bit mode, the output from the variant was:
+
+A         = 0x7FFF65BB15C0 (size 18)
+&A        = 0x7FFF65BB15C0 (size 18)
+&A[0][0]  = 0x7FFF65BB15C0 (size 2)
+&A[0][1]  = 0x7FFF65BB15C2 (size 2)
+&A[0][2]  = 0x7FFF65BB15C4 (size 2)
+&A[1][0]  = 0x7FFF65BB15C6 (size 2)
+&A[1][1]  = 0x7FFF65BB15C8 (size 2)
+&A[1][2]  = 0x7FFF65BB15CA (size 2)
+&A[2][0]  = 0x7FFF65BB15CC (size 2)
+&A[2][1]  = 0x7FFF65BB15CE (size 2)
+&A[2][2]  = 0x7FFF65BB15D0 (size 2)
+&A[0]     = 0x7FFF65BB15C0 (size 6)
+&A[1]     = 0x7FFF65BB15C6 (size 6)
+&A[2]     = 0x7FFF65BB15CC (size 6)
+
+  A[0][0] = 0  A[0][1] = 1  A[0][2] = 2
+  A[1][0] = 3  A[1][1] = 4  A[1][2] = 5
+  A[2][0] = 6  A[2][1] = 7  A[2][2] = 8
+
+There's a lot of noise in the 32-bit and 64-bit address versions, so we can keep with the 'pseudo 16-bit' address version.
+
+Notice how the address of A[0][0] is the same as the address of A[0] and A, but the the sizes of the object pointed to is different. &A[0][0] points to a single (short) integer; &A[0] points to an array of 3 (short) integers; &A points to an array of 3x3 (short) integers.
+
+Now we need to look at how a short ** works; it works quite differently. Here's some test code, related to but different from the previous example.
+
+#include <stdio.h>
+#include <inttypes.h>
+
+static void print_address(const char *tag, uintptr_t address, size_t size);
+
+int main(void)
+{
+    char  buffer[32];
+    short t[3] = { 99, 98, 97 };
+    short u[3] = { 88, 87, 86 };
+    short v[3] = { 77, 76, 75 };
+    short w[3] = { 66, 65, 64 };
+    short x[3] = { 55, 54, 53 };
+    short y[3] = { 44, 43, 42 };
+    short z[3] = { 33, 32, 31 };
+    short *a[3] = { t, v, y };
+    short **p = a;
+    int i, j;
+
+    print_address("t",  (uintptr_t)t,  sizeof(t));
+    print_address("u",  (uintptr_t)u,  sizeof(u));
+    print_address("v",  (uintptr_t)v,  sizeof(v));
+    print_address("w",  (uintptr_t)w,  sizeof(w));
+    print_address("x",  (uintptr_t)x,  sizeof(x));
+    print_address("y",  (uintptr_t)y,  sizeof(y));
+    print_address("z",  (uintptr_t)z,  sizeof(z));
+
+    print_address("a",  (uintptr_t)a,  sizeof(a));
+    print_address("&a", (uintptr_t)&a, sizeof(*(&a)));
+
+    for (i = 0; i < 3; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+            sprintf(buffer, "&a[%d][%d]", i, j);
+            print_address(buffer, (uintptr_t)&a[i][j], sizeof(*(&a[i][j])));
+        }
+    }
+
+    for (i = 0; i < 3; i++)
+    {
+        sprintf(buffer, "&a[%d]", i);
+        print_address(buffer, (uintptr_t)&a[i], sizeof(*(&a[i])));
+    }
+
+    putchar('\n');
+    for (i = 0; i < 3; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+            printf("  a[%d][%d] = %d", i, j, a[i][j]);
+        }
+        putchar('\n');
+    }
+
+    putchar('\n');
+    print_address("p",  (uintptr_t)p,  sizeof(*(p)));
+    print_address("&p", (uintptr_t)&p, sizeof(*(&p)));
+
+    for (i = 0; i < 3; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+            sprintf(buffer, "&p[%d][%d]", i, j);
+            print_address(buffer, (uintptr_t)&p[i][j], sizeof(*(&p[i][j])));
+        }
+    }
+
+    for (i = 0; i < 3; i++)
+    {
+        sprintf(buffer, "&p[%d]", i);
+        print_address(buffer, (uintptr_t)&p[i], sizeof(*(&p[i])));
+    }
+
+    putchar('\n');
+    for (i = 0; i < 3; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+            printf("  p[%d][%d] = %d", i, j, p[i][j]);
+        }
+        putchar('\n');
+    }
+
+    return 0;
+}
+
+static void print_address(const char *tag, uintptr_t address, size_t size)
+{
+    printf("%-8s  = 0x%.4" PRIXPTR " (size %zu)\n", tag, address & 0xFFFF, size);
+}
+
+This is a program in two halves. One half dissects the array a; the other dissects the double pointer p. Here is some ASCII art to help understand this:
+
++------+------+------+                      +------+------+------+
+|  99  |  98  |  97  |    t = 0x1000        |  88  |  87  |  86  |    u = 0x1100
++------+------+------+                      +------+------+------+
+
++------+------+------+                      +------+------+------+
+|  77  |  76  |  75  |    v = 0x1200        |  66  |  65  |  64  |    w = 0x1300
++------+------+------+                      +------+------+------+
+
++------+------+------+                      +------+------+------+
+|  55  |  54  |  53  |    x = 0x1400        |  44  |  43  |  42  |    y = 0x1500
++------+------+------+                      +------+------+------+
+
++------+------+------+
+|  33  |  32  |  31  |    z = 0x1600
++------+------+------+
+
++--------+--------+--------+
+| 0x1000 | 0x1200 | 0x1500 |    a = 0x2000
++--------+--------+--------+
+
++--------+
+| 0x2000 |                      p = 0x3000
++--------+
+
+Notice that the arrays t..z are located at 'arbitrary' locations - not contiguous in the diagram. It would be possible for some of the arrays to be global variables, for example, from another file, and others to be static variables in the same file but outside the function, and others to be static but local to the function, as well as these local automatic variables. You can see how p is a variable that contains an address; the address is the address of the array a. In turn, the array a contains 3 addresses, the addresses of 3 other arrays.
+
+This is the output from a 64-bit compilation of the program, artificially split. It simulates 16-bit addresses by masking off all except the last 4 digits of the hex address.
+
+t         = 0x75DA (size 6)
+u         = 0x75D4 (size 6)
+v         = 0x75CE (size 6)
+w         = 0x75C8 (size 6)
+x         = 0x75C2 (size 6)
+y         = 0x75BC (size 6)
+z         = 0x75B6 (size 6)
+
+This prevents warnings about unused variables, and also identifies the addresses of the 7 arrays of 3 integers.
+
+a         = 0x7598 (size 24)
+&a        = 0x7598 (size 24)
+&a[0][0]  = 0x75DA (size 2)
+&a[0][1]  = 0x75DC (size 2)
+&a[0][2]  = 0x75DE (size 2)
+&a[1][0]  = 0x75CE (size 2)
+&a[1][1]  = 0x75D0 (size 2)
+&a[1][2]  = 0x75D2 (size 2)
+&a[2][0]  = 0x75BC (size 2)
+&a[2][1]  = 0x75BE (size 2)
+&a[2][2]  = 0x75C0 (size 2)
+&a[0]     = 0x7598 (size 8)
+&a[1]     = 0x75A0 (size 8)
+&a[2]     = 0x75A8 (size 8)
+
+  a[0][0] = 99  a[0][1] = 98  a[0][2] = 97
+  a[1][0] = 77  a[1][1] = 76  a[1][2] = 75
+  a[2][0] = 44  a[2][1] = 43  a[2][2] = 42
+
+Note the important differences. The size of a is now 24 bytes, not 18, because it is an array of 3 (64-bit) pointers. The size of &a[n] is 8 bytes because each is a pointer. The method of loading the data at an array location is also quite different - you'd have to look at the assembler to see that, because the C source code looks the same.
+
+In the 2D array code, the load operation for A[i][j] computes:
+
+    byte address of A
+    adds (3 * i + j) * sizeof(short) to that byte address
+    fetches 2-byte integer from that address.
+
+In the array of pointer code, the load operation for A[i][j] computes:
+
+    byte address of a
+    adds i * sizeof(short *) to that byte address
+    fetches byte address from that calculated value, call it b
+    adds j * sizeof(short) to b
+    fetches 2-byte integer from address b
+
+The output for p is somewhat different. Note, in particular, the addresse in p is different from the address of p. However, once you're past that, the behaviour is basically the same.
+
+p         = 0x7598 (size 8)
+&p        = 0x7590 (size 8)
+&p[0][0]  = 0x75DA (size 2)
+&p[0][1]  = 0x75DC (size 2)
+&p[0][2]  = 0x75DE (size 2)
+&p[1][0]  = 0x75CE (size 2)
+&p[1][1]  = 0x75D0 (size 2)
+&p[1][2]  = 0x75D2 (size 2)
+&p[2][0]  = 0x75BC (size 2)
+&p[2][1]  = 0x75BE (size 2)
+&p[2][2]  = 0x75C0 (size 2)
+&p[0]     = 0x7598 (size 8)
+&p[1]     = 0x75A0 (size 8)
+&p[2]     = 0x75A8 (size 8)
+
+  p[0][0] = 99  p[0][1] = 98  p[0][2] = 97
+  p[1][0] = 77  p[1][1] = 76  p[1][2] = 75
+  p[2][0] = 44  p[2][1] = 43  p[2][2] = 42
+
+All of this was in a single (main) function. You will need to do parallel experimentation of your own when passing various pointers to functions and accessing the arrays behind those pointers.

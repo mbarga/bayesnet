@@ -1,0 +1,65 @@
+(potentially helpful: http://stackoverflow.com/questions/10952515/c-c-syslog-to-custom-file-not-var-log-syslog-but-var-log-mylog-ubuntu-12)
+
+The standard way to log from a C program is syslog.
+
+Start by including the header file:
+
+#include <syslog.h>
+
+Then early in your program, you should configure syslog by calling openlog:
+
+openlog("programname", 0, LOG_USER);
+
+The first argument is the identification or the tag, which is automatically added at the start of each message. Put your program's name here.
+
+The second argument is the options you want to use, or 0 for the normal behavior. The full list of options is in man 3 syslog. One you might find useful is LOG_PID, which makes syslog also record the process id in the log message.
+
+Then, each time you want to write a log message, you call syslog:
+
+syslog(LOG_INFO, "%s", "Message");
+
+The first argument is the priority. The priority ranges from DEBUG (least important) to EMERG (only for emergencies) with DEBUG, INFO, and ERR being the most commonly used. See man 3 syslog for your options.
+
+The second and third arguments are a format and a message, just like printf.
+
+Which log file this appears in depends on your syslog settings.
+
+With a default setup, it probably goes into /var/log/messages.
+
+You can set up a custom log file by using one of the facilities in the range LOG_LOCAL0 to LOG_LOCAL7.
+
+You use them by changing:
+
+openlog("programname", 0, LOG_USER);
+
+to
+
+openlog("programname", 0, LOG_LOCAL0);
+
+or
+
+openlog("programname", 0, LOG_LOCAL1);
+
+etc.
+
+and adding a corresponding entry to /etc/syslog.conf, e.g.
+
+local1.info /var/log/programname.log
+
+and restarting the syslog server, e.g.
+
+pkill -HUP syslogd
+
+The .info part of local1.info above means that all messages that are INFO or more important will be logged, including INFO, NOTICE, ERR (error), CRIT (critical), etc., but not DEBUG.
+
+Or, if you have rsyslog, you could try a property-based filter, e.g.
+
+:syslogtag, isequal, "programname"    /var/log/programname.log
+
+Or, if you are planning on distributing your software to other people, it's probably not a good idea to rely on using LOG_LOCAL or an rsyslog filter.
+
+In that case, you should use LOG_USER (if it's a normal program) or LOG_DAEMON (if it's a server), write your startup messages and error messages using syslog, but write all of your log messages to a file outside of syslog. For example, Apache HTTPd logs to /var/log/apache2/* or /var/log/httpd/*, I assume using regular open/fopen and write/printf calls.
+																																																								finally, 
+																																																								closelog();
+
+

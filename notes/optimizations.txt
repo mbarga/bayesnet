@@ -1,0 +1,4 @@
+# intel SSE (Streaming SIMD Extensions) - extension to the x86 instruction set
+http://www.codeproject.com/Articles/4522/Introduction-to-SSE-Programming
+http://software.intel.com/en-us/avx/
+

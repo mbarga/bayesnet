@@ -1,0 +1,10 @@
+gcc -o omp_pi -fopenmp pi.c -lprofiler   
+CPUPROFILE=./prof.out ./omp_pi 100000 4 
+pprof --gv ./omp_pi ./prof.out 
+
+
+configure with '... --enable-frame-pointers' or '... --with-libunwind=<path>'
+
+may need to run 'sudo /sbin/ldconfig' if libprofiler.so.0 not found
+
+(need libunwind, gv and graphviz installed)
