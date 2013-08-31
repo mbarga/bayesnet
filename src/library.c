@@ -49,6 +49,8 @@ void one_to_one(GHashTable *hash, double **local_scores)
 		{
 			u_index = u->index;
 
+			//small change
+
 			while (v_iter != NULL)
 			{
 				v = g_hash_table_lookup(hash, v_iter->data);
