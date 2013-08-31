@@ -7,6 +7,7 @@
 #include <math.h>
 
 int * randperm(int, int);
+void one_to_one(GHashTable **, double **);
 double score(NODE *, NODE *);
 
 #endif

@@ -16,29 +16,73 @@ void print_matrix(int *c, int size)
 	}
 }
 
-void free_nodes(NODE *x)
+void print_nodes(GHashTable *hash)
 {
-	free((*x).data);
-	free((*x).name);
-	free(x);
-	x = NULL;
+	GList * keys = NULL;
+	GSList * edge = NULL;
+	NODE * test = NULL;
+
+	keys = g_hash_table_get_keys(hash);
+	while (keys != NULL)
+	{
+		test = g_hash_table_lookup(hash, keys->data);
+		if (test != NULL)
+		{	
+			printf("node :: %s with index %d, edges: ", test->name, test->index);
+			edge = test->edges;
+			while (edge != NULL) 
+			{
+				test = edge->data;
+				printf("%s, ",test->name);
+				edge = edge->next;
+			}
+			printf("\n");
+		}
+		keys = keys->next;
+	}
+	g_list_free(keys);
+	keys = NULL;
+}
+
+void free_nodes(GHashTable *hash)
+{
+	GList *keys = g_hash_table_get_keys(hash);
+	NODE *test = NULL;
+
+	while (keys != NULL)
+	{
+		test = g_hash_table_lookup(hash, keys->data);
+		if (test != NULL)
+		{
+			g_slist_free(test->edges);
+			free(test);
+		}
+		keys = keys->next;
+	}
+
+	g_hash_table_destroy(hash);
+	hash = NULL;
+	g_list_free(keys);
+	keys = NULL;
 }
 
 int main(int argc, char *argv[])
 {
 	int status = 1;
 	char input_file_name[1024] =
-			"/home/mbarga/Dropbox/school/code/hc/data/toy.txt";
-	time_t current_time;
+			"/home/mbarga/Dropbox/git/bayesnet/data/toy2.txt";
+	//time_t current_time;
 
 	int i, j, k, u, v;
 	int x_size = 0;
 	int m_size = 5; // TODO pass this in as argument, etc.?
 
-	NODE *x = NULL; // set of all input nodes
+	//NODE *x = NULL; // set of all input nodes
+	GHashTable* hash = NULL;
 	int *m = NULL; // array of permuted indices for the nodes X
 	int *g = NULL; // adjacency matrix of the network
 	int *c = NULL; // node selection count matrix
+	double *l_scores = NULL;
 
 	double max_score = 0;
 
@@ -47,7 +91,7 @@ int main(int argc, char *argv[])
 //	syslog(LOG_INFO, "%s LOG INITIALIZED\n", ctime(&current_time));
 
 	// read in data samples from file
-	status = read_problem(input_file_name, &x, &x_size);
+	status = read_problem(input_file_name, &hash);
 
 	if (status != 0)
 	{
@@ -55,27 +99,21 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (x == NULL)
+	if (hash == NULL)
 	{
 		syslog(LOG_INFO, "%s", "main(): x was returned NULL\n");
 		return 1;
 	}
 
-/*	
-	 printf("--- Printing %d nodes ---\n", x_size);
-	 for(i=0; i<x_size; i++) {
-		 printf("%s :: ",x[i].name);
-		 for (j=0; j<2; ++j) {
-			 printf("%f, ",x[i].data[j]);
-		 }
-		 printf("\n");
-	 }
- */
+	x_size = g_hash_table_size(hash);
+	//printf("There are %d keys in the hash\n", x_size);
+	//print_nodes(hash);
 
 	g = Malloc(int, x_size*x_size);
 	c = Malloc(int, x_size*x_size);
 
 	// initialize c and g matrices <- 0
+	// initialize all 1-to-1 scores
 	for (i = 0; i < x_size; ++i)
 	{
 		for (j = 0; j < x_size; ++j)
@@ -85,7 +123,15 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/*********************** begin hill climbing algorithm ****************************/
+	one_to_one(hash, );
+	//
+	//
+	//
+	//BOOKMARK
+	//
+	//
+	//
+
 	// repeat for a set number of iterations
 	for (i = 0; i < MAX_ITER; ++i)
 	{
@@ -95,13 +141,13 @@ int main(int argc, char *argv[])
 					x_size);
 			free(g);
 			free(c);
-			free_nodes(x);
+			free_nodes(hash);
 			return 1;
 		}
 
 		m = randperm(m_size, x_size);
 		max_score = 0;
-/*
+
 		for (j = 0; j < m_size; ++j)
 		{
 			for (k = j+1; k < m_size; ++k)
@@ -112,7 +158,7 @@ int main(int argc, char *argv[])
 				++c[v * x_size + u];
 			}
 		}
-*/
+
 		//TODO should the order visited not be linear even though the subset has already been randomized?
 		//TODO how to encode the edges before sending to G?
 		// check for each operation (add, delete, reverse)
@@ -122,18 +168,18 @@ int main(int argc, char *argv[])
 			{
 				if (j == k) continue; // node cannot be its own parent
 				// m = randperm(m_size, m_size); // re-randomize the indices
-				u = m[j];
-				v = m[k];
-				++c[u * x_size + v];
-				++c[v * x_size + u];
+			//	u = m[j];
+			//	v = m[k];
+			//	++c[u * x_size + v];
+		//		++c[v * x_size + u];
 
-				if (score(x[u], x[v]) > max_score) 
+			//	if (score(x[u], x[v]) > max_score) 
 				{ // adding edge increases score
 				}
-				else if (score() > max_score)
+			//	else if (score() > max_score)
 				{ // deleting edge increases score
 				}
-				else if (score(x[v], x[u]) > max_score)
+			//	else if (score(x[v], x[u]) > max_score)
 				{ // reversing edge increases score
 				}
 			}
@@ -149,28 +195,25 @@ int main(int argc, char *argv[])
 	free(m);
 	free(g);
 	free(c);
-	free_nodes(x);
+	free_nodes(hash);
+	
 	syslog(LOG_INFO, "%s", "exiting cleanly\n");
 	closelog();
 	return 0;
 }
 
-int read_problem(const char *filename, NODE **x, int *n)
+int read_problem(const char *filename, GHashTable **x)
 {
 	FILE *fp = fopen(filename, "r");
-	char *p;
-	int isspace(int c);
-	char *endptr;
-	char *val, *label;
+	//int isspace(int c);
+	//char *endptr;
+	char *child_name, *parent_name;
 
-	double *data_space = NULL;
-	char *name_space = NULL;
-	NODE *result = NULL;
+	GHashTable* hash = g_hash_table_new(g_str_hash, g_str_equal);
+	NODE *parent = NULL;
+	NODE *child = NULL;
 
-	int numFeatures = 0;
-	int numNodes = 0;
-	int stop = 0;
-	int i, j;
+	int node_count = 0;
 
 	if (fp == NULL)
 	{
@@ -183,80 +226,44 @@ int read_problem(const char *filename, NODE **x, int *n)
 
 	while (read_line(fp) != NULL)
 	{
-		p = strtok(line, " \t\n"); // toss label
-		while (1)
-		{
-			p = strtok(NULL, "\t"); // read following tokens
-			if (p == NULL || *p == '\n')
-			{ // check '\n' as ' ' may be after the last feature
-				if (stop == 0)
-				{
-					stop = 1;
-					++numFeatures;
-				}
-				break;
-			}
-			if (stop == 0)
-			{
-				++numFeatures;
-			}
-		}
-		++numNodes;
-	}
-
-	//TODO count features properly?
-	numFeatures--;
-	rewind(fp);
-	syslog(LOG_INFO, "Found %d nodes, each with %d features\n", numNodes,
-			numFeatures);
-
-	result = Malloc(NODE, numNodes);
-	data_space = Malloc(double, numNodes*numFeatures);
-	name_space = Malloc(char, numNodes*max_name_len);
-
-	for (i = 0; i < numNodes; ++i)
-	{
-		read_line(fp);
-		label = strtok(line, " \t\n");
-		if (label == NULL)
+		child_name = strtok(line, " \t\n");
+		parent_name	= strtok(NULL, "\t\n"); //TODO clean this up??
+	//	child_name	= strtok(NULL, &endptr);
+		if (parent_name == NULL || child_name == NULL)
 		{
 			syslog(LOG_INFO, "%s", "FAILED::read_problem : empty line\n");
 			return 1;
 		}
-
-		// copy node name label to the node itself
-		strcpy(&name_space[i * max_name_len], label);
-
-		for (j = 0; j < numFeatures; ++j)
+	
+		child = g_hash_table_lookup(hash, child_name);
+		if (child == NULL)
 		{
-			val = strtok(NULL, "\t");
-			//TODO val = strtok(NULL, &endptr);
-
-			if (val == NULL)
-				break;
-
-			data_space[i * numFeatures + j] = strtod(val, &endptr);
-
-			if (endptr == val || (*endptr != '\0' && !isspace(*endptr)))
-			{
-				syslog(LOG_INFO, "%s",
-						"read_problem(): endpointer/val mismatch\n");
-			}
+			child 				= create_node();
+			child->index	= node_count++;
+			child->name 	= g_strdup(child_name);
+ 			g_hash_table_insert(hash, g_strdup(child_name), child); //TODO use node->name
 		}
-		result[i].name = &name_space[i * max_name_len];
-		result[i].data = &data_space[i * numFeatures];
+		
+		parent = g_hash_table_lookup(hash, parent_name);
+		if (parent == NULL)
+		{
+			parent 				= create_node();
+			parent->index	= node_count++;
+			parent->name 	= g_strdup(parent_name);
+ 			g_hash_table_insert(hash, g_strdup(parent_name), parent);
+		}
+	
+		parent->edges = g_slist_append(parent->edges, child);
 	}
 
-	*x = result;
-	result = NULL;
-	*n = numNodes;
+	*x = hash;
 
 	free(line);
 	fclose(fp);
 	return 0;
 }
 
-static char* read_line(FILE *input)
+static char * read_line(FILE *input)
 {
 	int len;
 
@@ -275,4 +282,15 @@ static char* read_line(FILE *input)
 	}
 
 	return line;
+}
+
+NODE * create_node()
+{
+	NODE *p;
+	//p = Malloc(NODE, 1);
+	p 				= g_new(NODE, 1);
+	p->name 	= NULL; 
+	p->index 	= 0;
+	p->edges	= NULL;
+	return p;
 }
