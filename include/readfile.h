@@ -1,13 +1,7 @@
-#ifndef _READFILE_H
-#define _READFILE_H
+#ifndef _READFILE_H_
+#define _READFILE_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <syslog.h>
-#include <glib.h>
-#include <math.h>
-
-int read_problem(const char *filename, GHashTable **x);
+int read_problem(const char *filename, GHashTable**, NODE**, int*);
 NODE* create_node();
 
 #endif

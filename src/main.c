@@ -1,296 +1,253 @@
 #include "main.h"
 #include "library.h"
+#include "readfile.h"
+#include "bdescore.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <syslog.h>
+#include <string.h>
+#include <glib.h> //TODO will this be supported on all machines?
 
 #define PROG_TAG "MAIN"
 
-void print_matrix(int *c, int size)
-{
-	int i, j;
-	for (i = 0; i < size; ++i)
-	{
-		for (j = 0; j < size; ++j)
-		{
-			printf("%d, ", c[i * size + j]);
-		}
-		printf("\n");
-	}
-}
-
-void print_nodes(GHashTable *hash)
-{
-	GList * keys = NULL;
-	GSList * edge = NULL;
-	NODE * test = NULL;
-
-	keys = g_hash_table_get_keys(hash);
-	while (keys != NULL)
-	{
-		test = g_hash_table_lookup(hash, keys->data);
-		if (test != NULL)
-		{	
-			printf("node :: %s with index %d, edges: ", test->name, test->index);
-			edge = test->edges;
-			while (edge != NULL) 
-			{
-				test = edge->data;
-				printf("%s, ",test->name);
-				edge = edge->next;
-			}
-			printf("\n");
-		}
-		keys = keys->next;
-	}
-	g_list_free(keys);
-	keys = NULL;
-}
-
-void free_nodes(GHashTable *hash)
-{
-	GList *keys = g_hash_table_get_keys(hash);
-	NODE *test = NULL;
-
-	while (keys != NULL)
-	{
-		test = g_hash_table_lookup(hash, keys->data);
-		if (test != NULL)
-		{
-			g_slist_free(test->edges);
-			free(test);
-		}
-		keys = keys->next;
-	}
-
-	g_hash_table_destroy(hash);
-	hash = NULL;
-	g_list_free(keys);
-	keys = NULL;
-}
-
 int main(int argc, char *argv[])
 {
-	int status = 1;
-	char input_file_name[1024] =
-			"/home/mbarga/Dropbox/git/bayesnet/data/toy2.txt";
-	//time_t current_time;
+    // TODO pass in some of these as arguments to the program?
+    char input_file_name[1024] =
+        "/home/mbarga/Dropbox/git/bayesnet/data/toy2.txt";
 
-	int i, j, k, u, v;
-	int x_size = 0;
-	int m_size = 5; // TODO pass this in as argument, etc.?
+    int x_size = 0;
+    int m_size = 3;
 
-	//NODE *x = NULL; // set of all input nodes
-	GHashTable* hash = NULL;
-	int *m = NULL; // array of permuted indices for the nodes X
-	int *g = NULL; // adjacency matrix of the network
-	int *c = NULL; // node selection count matrix
-	double *l_scores = NULL;
+    GHashTable* hash = NULL;
+    NODE *x = 	NULL;
 
-	double max_score = 0;
+    /* initialize logging */
+    openlog(PROG_TAG, 0, LOG_USER);
 
-	// initialize logging
-	openlog(PROG_TAG, 0, LOG_USER);
-//	syslog(LOG_INFO, "%s LOG INITIALIZED\n", ctime(&current_time));
+    /* read in data samples from file and check for possible errors */
+    int status = read_problem(input_file_name, &hash, &x, &x_size);
+    g_hash_table_destroy(hash); //TODO remove
 
-	// read in data samples from file
-	status = read_problem(input_file_name, &hash);
+    if (status != 0)
+    {
+        errlog("main(): failed to read input file\n");
+        return 1;
+    }
 
-	if (status != 0)
-	{
-		syslog(LOG_INFO, "%s", "main(): failed to read input file\n");
-		return 1;
-	}
+    if (x == NULL)
+    {
+        errlog("main(): x was returned NULL\n");
+        return 1;
+    }
 
-	if (hash == NULL)
-	{
-		syslog(LOG_INFO, "%s", "main(): x was returned NULL\n");
-		return 1;
-	}
+    if (m_size > x_size)
+    {
+        errlog("main(): |M| was larger than |X|\n");
+        free_nodes(x, x_size);
+        return 1;
+    }
 
-	x_size = g_hash_table_size(hash);
-	//printf("There are %d keys in the hash\n", x_size);
-	//print_nodes(hash);
+    /* allocate space for and initialize c and g matrices <- 0 */
+    int *g = Malloc(int, x_size*x_size); // adjacency matrix of the network
+    int *c = Malloc(int, x_size*x_size); // node selection count
 
-	g = Malloc(int, x_size*x_size);
-	c = Malloc(int, x_size*x_size);
+    for (int i = 0; i < x_size; ++i)
+    {
+        for (int j = 0; j < x_size; ++j)
+        {
+            g[i * x_size + j] = 0;
+            c[i * x_size + j] = 0;
+        }
+    }
 
-	// initialize c and g matrices <- 0
-	// initialize all 1-to-1 scores
-	for (i = 0; i < x_size; ++i)
-	{
-		for (j = 0; j < x_size; ++j)
-		{
-			g[i * x_size + j] = 0;
-			c[i * x_size + j] = 0;
-		}
-	}
+    /*
+     * calculate one to one local scores
+     *  (i,j)th element is the local score() of graph gene_i -> gene_j
+     */
+    double *local_scores = NULL;
+    one_to_one(&x, x_size, &local_scores);
 
-	one_to_one(hash, );
-	//
-	//
-	//
-	//BOOKMARK
-	//
-	//
-	//
+    /*
+     * repeated random sampling on subsets of X
+     */
+    int *m = Malloc(int, x_size); // array of permuted indices for the nodes X
+    for (int i=0; i < x_size; ++i) m[i] = i;
 
-	// repeat for a set number of iterations
-	for (i = 0; i < MAX_ITER; ++i)
-	{
-		if (m_size > x_size)
-		{
-			syslog(LOG_INFO, "main(): |M|=%d was larger than |X|=%d", m_size,
-					x_size);
-			free(g);
-			free(c);
-			free_nodes(hash);
-			return 1;
-		}
+    int n = 0;
+    int u, v;
+    while(n < MAX_SUBSETS)
+    {
+        randperm(m, m_size, x_size);
 
-		m = randperm(m_size, x_size);
-		max_score = 0;
+        /*
+         * c_(u,v) <- c_(u,v) + 1 AND c_(v,u) <- c_(u,v) for all (X_u, X_v) in M
+         */
+        for (int i = 0; i < m_size; ++i)
+        {
+            for (int j = i+1; j < m_size; ++j)
+            {
+                u = m[i];
+                v = m[j];
+                ++c[u * x_size + v];
+                ++c[v * x_size + u];
+            }
+        }
 
-		for (j = 0; j < m_size; ++j)
-		{
-			for (k = j+1; k < m_size; ++k)
-			{
-				u = m[j];
-				v = m[k];
-				++c[u * x_size + v];
-				++c[v * x_size + u];
-			}
-		}
+        /*
+         * Estimate DAG on G_M using HC algorithm
+         */
+        //estimate_dag(&hash, m, m_size);
+        ++n;
+    }
 
-		//TODO should the order visited not be linear even though the subset has already been randomized?
-		//TODO how to encode the edges before sending to G?
-		// check for each operation (add, delete, reverse)
-		for (j = 0; j < m_size; ++j)
-		{
-			for (k = 0; k < m_size; ++k)
-			{
-				if (j == k) continue; // node cannot be its own parent
-				// m = randperm(m_size, m_size); // re-randomize the indices
-			//	u = m[j];
-			//	v = m[k];
-			//	++c[u * x_size + v];
-		//		++c[v * x_size + u];
+    /*TODO
+     * traverse the nodes and pick edges to add to the final graph G
+     */
 
-			//	if (score(x[u], x[v]) > max_score) 
-				{ // adding edge increases score
-				}
-			//	else if (score() > max_score)
-				{ // deleting edge increases score
-				}
-			//	else if (score(x[v], x[u]) > max_score)
-				{ // reversing edge increases score
-				}
-			}
-		}
-		//TODO ensure no cycles?
-		//TODO for each selected directed edge in the G_M DAG, add the edge to the adjacency matrix g
+    /*
+     * cleanup before exiting the algorithm
+     */
+    //print_matrix(c, x_size);
+    //print_matrix(g,x_size);
+    free(m);
+    free(g);
+    free(c);
+    free(local_scores);
+    free_nodes(x, x_size);
 
-	}
-
-	// cleanup before exiting the algorithm
-	//print_matrix(c,x_size);
-	//print_matrix(g,x_size);
-	free(m);
-	free(g);
-	free(c);
-	free_nodes(hash);
-	
-	syslog(LOG_INFO, "%s", "exiting cleanly\n");
-	closelog();
-	return 0;
+    syslog(LOG_INFO, "%s", "exiting cleanly\n");
+    closelog();
+    return 0;
 }
 
-int read_problem(const char *filename, GHashTable **x)
+//TODO this should only traverse the group of highest scoring parent candidates
+//TODO permute the candidate learning orders as well
+/*
+ * consideration (TRUE HC):
+ * (1) find set of max socring parent candidates and hold them as a list
+ * (2a) since no edges connected, try adding edges for each candidate and choose the
+ * 	best scoring
+ * (2b) for each candidate try the other two operations that are not already employed
+ * 	(for empty graph, this will be reverse or add)
+ * (3) when visiting the same node again, when visiting parent candidates, employ
+ * 	operations that are not already employed
+ * (4) set maximum limit for parents when adding them
+ *
+ * another consideration:
+ * (1) find set of maximum scoring parent candidates and add edges to all
+ * 	of thm for each node.
+ * (2) select one gene at a time and then one parent edge at a time (in random order)
+ * 	and try reversing or adding
+ *
+ * 	NOTES:
+ * 		when reversing edge, keep that parent candidate in the candidate history?
+ * 		(this candidate will now actually be a child)
+ */
+void estimate_dag(NODE *x, int x_size, int *m, int m_size, int **g)
 {
-	FILE *fp = fopen(filename, "r");
-	//int isspace(int c);
-	//char *endptr;
-	char *child_name, *parent_name;
+    double current_score = 0;
+		double max_diff_a[3] = {0, 1, 0}; // {difference, action = 1, candidate parent index} 
+		double max_diff_d[3] = {0, 2, 0}; //
+		double max_diff_r[3] = {0, 3, 0}; //
+    char improvement = 1;
 
-	GHashTable* hash = g_hash_table_new(g_str_hash, g_str_equal);
-	NODE *parent = NULL;
-	NODE *child = NULL;
+    int i = 0;
+    while (improvement == 1 && i < MAX_ITER)
+    {
+        improvement = 0;
+        current_score = calc_bdescore();
 
-	int node_count = 0;
+        randperm(m, m_size, m_size); // rerandomize the indices to traverse
 
-	if (fp == NULL)
-	{
-		syslog(LOG_INFO, "%s", "read_problem(): couldnt open input file\n");
-		return 1;
-	}
+        // for all children u
+				// only need to compute f() on the FAMILY SUBGRAPH containing child + parents
+        for (int u = 0; u < m_size; ++u)
+        {
+            //TODO collapse all of this?
+            //
+            // test edge addition
+						max_diff_a[0] = 0;
+            for (int v = 0; v < m_size; ++v)
+            {
+                if (u == v) continue; // node cannot be its own parent
 
-	max_line_len = 1024;
-	line = Malloc(char, max_line_len);
+                if ( *g[u*x_size + v] == 0 )
+                {
+                    // calculate score diff = f(G + {x_v -> x_u)) - f(G)
+										double diff = calc_bdescore() - current_score;
 
-	while (read_line(fp) != NULL)
-	{
-		child_name = strtok(line, " \t\n");
-		parent_name	= strtok(NULL, "\t\n"); //TODO clean this up??
-	//	child_name	= strtok(NULL, &endptr);
-		if (parent_name == NULL || child_name == NULL)
-		{
-			syslog(LOG_INFO, "%s", "FAILED::read_problem : empty line\n");
-			return 1;
-		}
-	
-		child = g_hash_table_lookup(hash, child_name);
-		if (child == NULL)
-		{
-			child 				= create_node();
-			child->index	= node_count++;
-			child->name 	= g_strdup(child_name);
- 			g_hash_table_insert(hash, g_strdup(child_name), child); //TODO use node->name
-		}
-		
-		parent = g_hash_table_lookup(hash, parent_name);
-		if (parent == NULL)
-		{
-			parent 				= create_node();
-			parent->index	= node_count++;
-			parent->name 	= g_strdup(parent_name);
- 			g_hash_table_insert(hash, g_strdup(parent_name), parent);
-		}
-	
-		parent->edges = g_slist_append(parent->edges, child);
-	}
+										if (diff > max_diff_a[0]) 
+										{
+												// store the difference and the candidate parent index
+												max_diff_a[0] = diff;
+												max_diff_a[2] = v; 
+												improvement = 1;
+										}
+                }
+            }
 
-	*x = hash;
+            // test edge deletion
+						max_diff_d[0] = 0;
+            for (int v = 0; v < m_size; ++v)
+            {
+                if (u == v) continue;
 
-	free(line);
-	fclose(fp);
-	return 0;
-}
+                if ( *g[u*x_size + v] == 1 )
+                {
+                    // calculate score diff = f(G / {x_v -> x_u)) - f(G)
+										double diff = calc_bdescore() - current_score;
 
-static char * read_line(FILE *input)
-{
-	int len;
+										if (diff > max_diff_d[0])
+										{
+												// store the difference and the candidate parent index
+												max_diff_d[0] = diff;
+												max_diff_d[2] = v;
+												improvement = 1;
+										}
+                }
+            }
 
-	if (fgets(line, max_line_len, input) == NULL)
-	{
-		return NULL;
-	}
+            // test edge reversal
+						max_diff_r[0] = 0;
+            for (int v = 0; v < m_size; ++v)
+            {
+                if (u == v) continue;
 
-	while (strrchr(line, '\n') == NULL)
-	{
-		max_line_len *= 2;
-		line = (char *) realloc(line, max_line_len);
-		len = (int) strlen(line);
-		if (fgets(line + len, max_line_len - len, input) == NULL)
-			break;
-	}
+                if ( *g[u*x_size + v] == 1 )
+                {
+                    // calculate score diff = d1 + d2
+										double d1 = calc_bdescore() - current_score; // f(G / {x_v -> x_u}) - f(G)
+										double d2 = calc_bdescore() - current_score; // f(G + {x_u -> x_v}) - f(G)
+										double diff = d1 + d2;
 
-	return line;
-}
+										if (diff > max_diff_r[0])
+										{
+												// store the difference and the candidate parent index
+												max_diff_r[0] = diff;
+												max_diff_r[2] = v; 
+												improvement = 1;
+										}
+                }
+            }
 
-NODE * create_node()
-{
-	NODE *p;
-	//p = Malloc(NODE, 1);
-	p 				= g_new(NODE, 1);
-	p->name 	= NULL; 
-	p->index 	= 0;
-	p->edges	= NULL;
-	return p;
+						// choose max of three operations and apply the corresponding action to the graph
+						double *action = max(max_diff_a, max_diff_d, max_diff_r);
+						if (action != NULL)
+						{
+										int parent = action[2];
+										if (action[1] == 1) {*g[u*x_size + parent] = 1;}
+										if (action[1] == 2) {*g[u*x_size + parent] = 0;}
+										if (action[1] == 3) {*g[u*x_size + parent] = 0; *g[parent*x_size + u] = 1;}
+						}
+
+        }
+        //TODO ensure no cycles?
+				//TODO what if the score improvement is the same between two actions?
+        //TODO for each selected directed edge in the G_M DAG, add the edge to the adjacency matrix g
+        //       how to encode?
+
+        ++i;
+    }
 }

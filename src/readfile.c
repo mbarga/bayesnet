@@ -1,10 +1,25 @@
 #include "main.h"
 #include "readfile.h"
+#include "library.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <syslog.h>
+#include <glib.h>
+#include <math.h>
+#include <string.h>
+
+#define PROG_TAG "READFILE"
 
 static char *line = NULL;
 static int max_line_len;
 //static int max_name_len = 128;
 
+/* Function
+ * -------------------
+ *
+ *
+ */
 static char * read_line(FILE *input)
 {
 	int len;
@@ -26,7 +41,12 @@ static char * read_line(FILE *input)
 	return line;
 }
 
-int read_problem(const char *filename, GHashTable **x)
+/* Function
+ * -------------------
+ *
+ *
+ */
+int read_problem(const char *filename, GHashTable **x_hash, NODE **x, int *x_size)
 {
 	FILE *fp = fopen(filename, "r");
 	//int isspace(int c);
@@ -34,14 +54,18 @@ int read_problem(const char *filename, GHashTable **x)
 	char *child_name, *parent_name;
 
 	GHashTable* hash = g_hash_table_new(g_str_hash, g_str_equal);
+	GList *keys = NULL;
 	NODE *parent = NULL;
 	NODE *child = NULL;
+	NODE *temp = NULL;
+	NODE *nodes = NULL;
 
 	int node_count = 0;
+	int index;
 
 	if (fp == NULL)
 	{
-		syslog(LOG_INFO, "%s", "read_problem(): couldnt open input file\n");
+		errlog("read_problem(): couldnt open input file\n");
 		return 1;
 	}
 
@@ -55,7 +79,7 @@ int read_problem(const char *filename, GHashTable **x)
 	//	child_name	= strtok(NULL, &endptr);
 		if (parent_name == NULL || child_name == NULL)
 		{
-			syslog(LOG_INFO, "%s", "FAILED::read_problem : empty line\n");
+			errlog("FAILED::read_problem : empty line\n");
 			return 1;
 		}
 	
@@ -65,6 +89,7 @@ int read_problem(const char *filename, GHashTable **x)
 			child 				= create_node();
 			child->index	= node_count++;
 			child->name 	= g_strdup(child_name);
+			child->expression = generate_local_probability(); //TODO remove(move somewhere else)
  			g_hash_table_insert(hash, g_strdup(child_name), child); //TODO use node->name
 		}
 		
@@ -74,30 +99,56 @@ int read_problem(const char *filename, GHashTable **x)
 			parent 				= create_node();
 			parent->index	= node_count++;
 			parent->name 	= g_strdup(parent_name);
- 			g_hash_table_insert(hash, g_strdup(parent_name), parent);
+			parent->expression = generate_local_probability(); //TODO remove(move somewhere else)
+ 			g_hash_table_insert(hash, g_strdup(parent_name), parent); //TODO use node->name
 		}
 	
-		parent->edges = g_slist_append(parent->edges, child);
+		child->parents = g_slist_append(child->parents, parent);
 	}
 
-	*x = hash;
+	/*
+	 * write a copy of nodes in the hash table to an array
+	 */
+	nodes = Malloc(NODE, node_count);
+	keys = g_hash_table_get_keys(hash);
+	while(keys != NULL)
+	{
+		temp = (NODE*)g_hash_table_lookup(hash, keys->data);
+		index = temp->index;
+		nodes[index] = *temp;
+		keys = keys->next;
+	}
+	g_list_free(keys);
+	keys = NULL;
+
+	*x_hash = hash;
+	*x = nodes;
+	*x_size = node_count;
 
 	free(line);
 	child_name = NULL;
 	parent_name = NULL;
 	parent = NULL;
 	child = NULL;
+	temp = NULL;
+	nodes = NULL;
 	fclose(fp);
 	return 0;
 }
 
+/* Function
+ * -------------------
+ *
+ *
+ */
 NODE * create_node()
 {
 	NODE *p;
-	//p = Malloc(NODE, 1);
-	p 				= g_new(NODE, 1);
+	p = Malloc(NODE, 1);
+	//p 				= g_new(NODE, 1);
 	p->name 	= NULL; 
 	p->index 	= 0;
-	p->edges	= NULL;
+	p->parents= NULL;
+	p->expression = 0;
 	return p;
 }

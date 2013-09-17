@@ -6,7 +6,7 @@ LDFLAGS = $(shell pkg-config --libs glib-2.0 gtk+-2.0) -lm
 all: main
 
 main:
-	$(CC) $(CFLAGS) ./src/library.c ./src/main.c -o ./bin/hc $(LDFLAGS)
+	$(CC) $(CFLAGS) ./src/readfile.c ./src/library.c ./src/bdescore.c ./src/main.c -o ./bin/hc $(LDFLAGS)
 
 clean:
 	rm -f *~.o ./bin/*
