@@ -1,3 +1,0 @@
-install libunwind with ./configure -CFLAGS=U_UNFORTIFY_SOURCE
-install google perftools
-run http://stackoverflow.com/questions/1581494/google-perftool-cannot-read-file-libprofiler-so-0

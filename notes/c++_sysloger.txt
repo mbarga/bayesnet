@@ -1,4 +1,0 @@
-syslog output: http://stackoverflow.com/questions/2638654/redirect-c-stdclog-to-syslog-on-unix
-Dobb's logger: http://stackoverflow.com/questions/5028302/small-logger-class
-
-Pantheios
