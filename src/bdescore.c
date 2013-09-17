@@ -1,113 +1,148 @@
 #include "main.h"
 #include "bdescore.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <math.h>
+
 /* Function
  * -------------------
  *
  *
  */
-//double score(NODE *x, int *parents, int m_size)
-double calc_bdescore() 
+void *bde_init(double *data, int node_count, int sample_count, int categories,
+		int max_parents)
 {
-    double score = rand() % 100;
-    BDEBuff * bf = (BDEBuff *) buff;
+	BUFFER *buff;
+	buff = (BUFFER *) malloc(siseof(BUFFER));
 
-    /* likelihood */`
-    int count = BDE_count_n_ijk(bf, parents, q, j);
-#ifdef SIGN_DEBUG
-    fprintf(SIGN_ERR, "BDE_score(): count = %d\n", count);
-#endif
-    double score = BDE_calc_bde(bf->n_ijk, bf->fixed_alpha, j, parents, q,
-                                count, bf->r);
+	buff->prior = 0;
+	buff->fixed_alpha = 1.0;
+	buff->node_count = node_count;
+	buff->sample_count = sample_count;
+	buff->categories = categories;
+	buff->max_parents = max_parents;
+	buff->data = data;
 
-    /* prior */
-    switch (bf->prior)
-    {
-    case BDE_PRIOR_TYPE_FIXED:
-        score = -2 * score;
-        break;
-
-    default:
-        fprintf(stderr, "FATAL ERROR: BDE: Unknown prior type specified.\n");
-        exit(1);
-    }
-
-
-    return score;
+	size_t mem;
+	mem = sizeof(int) * buff->max_parents * buff->sample_count;
+	buff->n_ij = (int *) malloc(mem);
+	mem = sizeof(int) * buff->sample_count * categories;
+	buff->n_ijk = (int *) malloc(mem);
 }
 
-// (Buff *bf, "", "")
-int count_nijk(const int *parents, int q, int i)
+/* Function
+ * -------------------
+ *
+ *
+ */
+double get_score(void *buff, int j, int *parents, int q)
 {
+	BUFFER *bf = (BUFFER *) buff;
 
-    int n_ij_count = 0;
+	/* likelihood */
+	int count = count_n_ijk(bf, parents, q, j);
 
-    for (int l = 0; l < bf->n; l++)
-    {
-        /* j[m] : parent stat vector */
-        int j[q];
-        for (int m = 0; m < q; m++)
-            j[m] = bf->X[l + parents[m] * bf->n];
+	double score = calc_bde(bf->n_ijk, bf->fixed_alpha, j, parents, q, count,
+			bf->categories);
 
-        /* Find 'stat vector' from n_ij */
-        int s = 0; /* stat vector position in n_ij */
-        while (s < n_ij_count)
-        {
-            const int * vec = bf->n_ij + s * bf->max_parents;
-            int flag2 = 0;
-            for (int ii = 0; ii < q; ii++)
-            {
-                if (j[ii] != vec[ii])
-                {
-                    flag2 = -1;
-                    break;
-                }
-            }
-            if (flag2 == 0)
-                break; /* found */
+	/* prior */
+	score = -2 * score;
 
-            s++;
-        }/* while(s < n_ij_count) */
-
-        if (s == n_ij_count)
-        {
-            /* Not found.  Creats a new element */
-            memcpy(bf->n_ij + s * bf->max_parents, j, sizeof(int) * q);
-            n_ij_count++;
-
-            bzero(bf->n_ijk + s * bf->r[i], sizeof(int) * bf->r[i]);
-        }
-
-        int xi = (int) bf->Y[l + i * bf->n];
-        bf->n_ijk[xi + s * bf->r[i]]++;
-    }/* for l < n */
-
-    return n_ij_count;
+	return score;
 }
 
-double BDE_calc_bde(int * n_ijk, double fixed_alpha, int i, const int * parents,
-                    int q, int count, int * r)
+/* Function
+ * -------------------
+ *
+ *
+ */
+int count_nijk(BUFFER *buff, int *parents, int parents_count)
 {
-    double score = 0.0;
+	int n_ij_count = 0;
 
-    for (int j = 0; j < count; j++)
-    {
-        double aij = fixed_alpha * r[i];
-        double nij = 0;
-        for (int k = 0; k < r[i]; k++)
-            nij += n_ijk[r[i] * j + k];
-        double g_aij = lgamma(aij);
-        double g_aijnij = lgamma(nij + aij);
+	for (int l = 0; l < buff->sample_count; ++l)
+	{
+		int j[parents_count];
+		for (int m = 0; m < parents_count; ++m)
+		{
+			//TODO rearrange indices??
+			j[m] = buff->data[l + parents[m] * buff->sample_count];
+		}
 
-        score += (g_aij - g_aijnij);
+		/* Find 'stat vector' from n_ij */
+		int s = 0; /* stat vector position in n_ij */
+		while (s < n_ij_count)
+		{
+			const int * vec = buff->n_ij + s * buff->max_parents;
+			int flag2 = 0;
+			for (int ii = 0; ii < parents_count; ++ii)
+			{
+				if (j[ii] != vec[ii])
+				{
+					flag2 = -1;
+					break;
+				}
+			}
+			if (flag2 == 0)
+				break; /* found */
 
-        for (int k = 0; k < r[i]; k++)
-        {
-            double g_a = lgamma(fixed_alpha + n_ijk[k + j * r[i]]);
-            double g_b = lgamma(fixed_alpha);
-            score += (g_a - g_b);
-        }
-    }/* for j < count */
+			s++;
+		}/* while(s < n_ij_count) */
 
-    return score;
+		if (s == n_ij_count)
+		{
+			/* Not found.  Creats a new element */
+			memcpy(buff->n_ij + s * buff->max_parents, j,
+					sizeof(int) * parents_count);
+			n_ij_count++;
+
+			bzero(buff->n_ijk + s * buff->categories,
+					sizeof(int) * buff->categories);
+		}
+
+		/*TODO properly implement this
+		 int xi = (int) bf->Y[l + i * bf->n];
+		 bf->n_ijk[xi + s * bf->r[i]]++;
+		 */
+	}/* for l < n */
+
+	return n_ij_count;
+}
+
+/* Function
+ * -------------------
+ *
+ *
+ */
+double calc_bde(int *n_ijk, double fixed_alpha, int *parents, int q, int count,
+		int categories)
+{
+	double score = 0.0;
+
+	for (int j = 0; j < count; ++j)
+	{
+		double aij = fixed_alpha * categories;
+		double nij = 0;
+		for (int k = 0; k < categories; k++)
+		{
+			nij += n_ijk[categories * j + k];
+		}
+
+		double g_aij = lgamma(aij);
+		double g_aijnij = lgamma(nij + aij);
+
+		score += (g_aij - g_aijnij);
+
+		for (int k = 0; k < categories; k++)
+		{
+			double g_a = lgamma(fixed_alpha + n_ijk[k + j * categories]);
+			double g_b = lgamma(fixed_alpha);
+			score += (g_a - g_b);
+		}
+	}/* for j < count */
+
+	return score;
 }

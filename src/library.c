@@ -117,8 +117,8 @@ void free_nodes(NODE *x, int x_size) {
 	if (nodes != NULL) {
 		for (i = 0; i < x_size; ++i) {
 			//free(x[i].parents);
-			g_slist_free(nodes[i]->parents);
-			free(x[i]->name);
+			g_slist_free(nodes[i].parents);
+			free(x[i].name);
 		}
 	}
 
