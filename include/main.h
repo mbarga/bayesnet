@@ -10,12 +10,11 @@
 
 typedef struct node
 {
-	gchar* 	name;		// node name as string
-	gint 		index;	// node probability data array
-	int			expression; // C {-1, 0, 1} expression level of gene
-	GSList* parents;
-} NODE;
+    //gchar* name;        // node name as string
+    //gint index;         // node probability data array
+    //int expression;     // C {-1, 0, 1} expression level of gene
 
-void estimate_dag(NODE*, int, int *, int, int**);
+    GSList* parents;
+} NODE;
 
 #endif

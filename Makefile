@@ -7,6 +7,10 @@ all: main
 
 main:
 	$(CC) $(CFLAGS) ./src/readfile.c ./src/library.c ./src/bdescore.c ./src/main.c -o ./bin/hc $(LDFLAGS)
+test:
+	$(CC) $(CFLAGS) ./src/library.c ./src/bdescore.c ./src/main.c -o ./bin/hc $(LDFLAGS)
+score:
+	$(CC) $(CFLAGS) ./src/bdescore.c ./src/bdetest.c -o ./bin/bdetest $(LDFLAGS)
 
 clean:
 	rm -f *~.o ./bin/*
