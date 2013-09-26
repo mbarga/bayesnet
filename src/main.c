@@ -165,6 +165,8 @@ estimate_dag(double *X, NODE *Y, int n, int m, int max_parents, int *candidates,
     while (improvement == 1 && i < MAX_ITER)
     {
         improvement = 0;
+
+        // TODO implement parent sets properly
         int parents[2];
         int parent_size = 2;
         void * buffer = bde_init(X, n, m, categories, max_candidates);

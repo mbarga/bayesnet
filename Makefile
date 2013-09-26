@@ -10,7 +10,9 @@ main:
 test:
 	$(CC) $(CFLAGS) ./src/library.c ./src/bdescore.c ./src/main.c -o ./bin/hc $(LDFLAGS)
 score:
-	$(CC) $(CFLAGS) ./src/bdescore.c ./src/bdetest.c -o ./bin/bdetest $(LDFLAGS)
+	$(CC) $(CFLAGS) ./src/bdescore.c ./src/bdetest.c -o bdetest $(LDFLAGS)
+prob:
+	$(CC) $(CFLAGS) ./src/probability.c ./src/probtest.c -o probtest $(LDFLAGS)
 
 clean:
 	rm -f *~.o ./bin/*
