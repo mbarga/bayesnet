@@ -1,4 +1,4 @@
-#include "bdescore.h"
+#include "score.h"
 
 #include <stdio.h>
 #include <stdlib.h>

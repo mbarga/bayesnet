@@ -6,13 +6,13 @@ LDFLAGS = $(shell pkg-config --libs glib-2.0 gtk+-2.0) -lm
 all: main
 
 main:
-	$(CC) $(CFLAGS) ./src/readfile.c ./src/library.c ./src/bdescore.c ./src/main.c -o ./bin/hc $(LDFLAGS)
-test:
-	$(CC) $(CFLAGS) ./src/library.c ./src/bdescore.c ./src/main.c -o ./bin/hc $(LDFLAGS)
+	$(CC) $(CFLAGS) ./src/readfile.c ./src/library.c ./src/probability.c ./src/score.c ./src/search.c ./src/main.c -o ./bin/hc $(LDFLAGS)
 score:
-	$(CC) $(CFLAGS) ./src/bdescore.c ./src/bdetest.c -o bdetest $(LDFLAGS)
+	$(CC) $(CFLAGS) ./src/score.c ./src/test/bdetest.c -o ./bin/bdetest $(LDFLAGS)
 prob:
-	$(CC) $(CFLAGS) ./src/probability.c ./src/probtest.c -o probtest $(LDFLAGS)
+	$(CC) $(CFLAGS) ./src/probability.c ./src/test/probtest.c -o ./bin/probtest $(LDFLAGS)
+read:
+	$(CC) $(CFLAGS) ./src/readfile.c ./src/test/testread.c -o ./bin/readtest $(LDFLAGS)
 
 clean:
 	rm -f *~.o ./bin/*

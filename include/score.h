@@ -1,5 +1,5 @@
-#ifndef _BDESCORE_H_
-#define _BDESCORE_H_
+#ifndef _SCORE_H_
+#define _SCORE_H_
 
 //TODO use of CONST INTS
 void * 	bde_init(double*, int, int, int, int);
