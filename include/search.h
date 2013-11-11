@@ -1,9 +1,9 @@
 #ifndef _SEARCH_H_
 #define _SEARCH_H_
 
-#include "main.h"
+#include "node.h"
 
 void
-estimate_dag(double *, NODE *, int, int, int, int, int, int **, int **);
+estimate_dag(double *, NODE *, int, int, int, int, int, int *, int *);
 
 #endif

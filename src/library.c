@@ -1,98 +1,68 @@
-#include "main.h"
 #include "library.h"
 #include "score.h"
 
-#include <stdio.h>
 #include <stdlib.h>
-#include <syslog.h>
-#include <math.h>
-#include <glib.h>
+#include <stdio.h>
+#include <omp.h>
 
-#define PROG_TAG "LIBRARY"
+#define Malloc(type,n) (type *)malloc((n)*sizeof(type))
+#define OMP_DEBUG = 1
 
-/* Function
- * -------------------
- * calculate all 1-to-1 scores
- * TODO use array of nodes instead
- * TODO use bidirectional edge? or directed edge scores?
- * TODO move to score file?
+/* ##############################################################################*/
+/**
+ * @brief  calculate all 1-to-1 (DIRECTED EDGE) scores
+ *
+ * @param X
+ * @param p
+ * @param local_scores
+ * @param n
+ * @param r
  */
+/* ##############################################################################*/
 void
-one_to_one(double *x, int x_size, double **local_scores, int sample_size,
-        int categories)
+one_to_one(double   *X, 
+           int       p, 
+           double  **local_scores, 
+           int       n, 
+           int       r)
 {
-    double *scores = Malloc(double, x_size*x_size);
-    void *buff = bde_init(x, x_size, sample_size, categories, 1);
+    double *scores = Malloc(double, p*p);
+    memset(scores, 0, sizeof(scores[0]) * p * p);
 
-    // loop over each possible child-pair edge
-    for (int u = 0; u < x_size; ++u)
+#pragma omp parallel shared(X, p, n, r, scores)
     {
-        for (int v = 0; v < x_size; ++v)
-        {
-            if (u == v)
-                continue;
+        void *buff = bde_init(X, p, n, r, 1);
+        //double t_start = omp_get_wtime();
 
-            /* score edge(u,v) */
-            //TODO fix this
-            int parents[] =
-                { v };
-            double score = get_score(buff, parents, 1);
-            scores[u * x_size + v] = score;
-            //printf("local score (%d,%d) was: %f\n",u,parents[0],score);
-        }
-    }
+#pragma omp for
+        // loop over each possible child-pair edge
+        for (int u = 0; u < p; ++u)
+            for (int v = 0; v < p; ++v)
+            {
+                if (u == v)
+                    continue;
 
-    bde_destroy_buff(buff);
+                double score = get_score(buff, &v, 1);
+                scores[v * p + u] = score;
+            }
+        //printf("local_score :: thread%d time on wall %f\n", omp_get_thread_num(), omp_get_wtime() - t_start);
+        bde_destroy_buff(buff);
+    } // end pragma omp parallel
 
     *local_scores = scores;
     scores = NULL;
 }
 
-/*
-void
-print_nodes(NODE *x, int x_size)
-{
-    int i;
-    GSList * edge = NULL;
-    NODE* test;
-
-    for (i = 0; i < x_size; ++i)
-    {
-        printf("node :: %s with index %d, edges: ", x[i].name, x[i].index);
-        edge = x[i].parents;
-        while (edge != NULL)
-        {
-            test = edge->data;
-            printf("%s, ", test->name);
-            edge = edge->next;
-        }
-        printf("\n");
-    }
-
-    g_slist_free(edge);
-    edge = NULL;
-}
-*/
-
+/* ##############################################################################*/
+/**
+ * @brief 
+ *
+ * @param s
+ */
+/* ##############################################################################*/
 void
 errlog(char *s)
 {
     fprintf(stderr, "%s", s);
     //syslog(LOG_INFO, "%s", "randperm(): m was found NULL\n");
 }
-
-/*
-void
-scramble(int **indices, int size)
-{
-    int i, j, t;
-
-    for (i = 0; i < size; ++i)
-    {
-        j = rand() % (size - i) + i;
-        t = *indices[j];
-        *indices[j] = *indices[i];
-        *indices[i] = t;
-    }
-}
-*/

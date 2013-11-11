@@ -121,6 +121,7 @@ count_nijk(BUFFER *buff, int *parents, int parents_count)
             //TODO rearrange indices??
             j[m] = buff->data[i + parents[m] * buff->sample_count];
         }
+        //printf("DONE\n");
 
         /* Find 'stat vector' from n_ij */
         int s = 0; /* stat vector position in n_ij */

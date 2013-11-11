@@ -1,4 +1,5 @@
 #include "probability.h"
+#include "ran2.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,7 +35,7 @@ static const double p_1[5][1][3] =
 int
 get_expression(int *parents, int size)
 {
-    srand(time(NULL));
+    srandinter(time(NULL));
 
     int i = rand() % 5;
     int j;
@@ -55,7 +56,7 @@ get_expression(int *parents, int size)
     int categories[] =
         { 1, 2, 3 };
     int n = sizeof(categories) / sizeof(categories[0]);
-    srand(time(NULL));
+    srandinter(time(NULL));
     int e = my_rand(categories, freq, n);
 
     return e;
@@ -115,7 +116,7 @@ my_rand(int arr[], int freq[], int n)
 
     // prefix[n-1] is sum of all frequencies. Generate a random number
     // with value from 1 to this sum
-    int r = (rand() % prefix[n - 1]) + 1;
+    int r = randinter(0, prefix[n - 1]);
 
     // Find index of ceiling of r in prefix array
     int indexc = find_ceil(prefix, r, 0, n - 1);

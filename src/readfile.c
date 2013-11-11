@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h> // size_t type definition
+#include <unistd.h> // ssize_t type definition
 
 #define Malloc(type,n) (type *)malloc((n)*sizeof(type))
 
