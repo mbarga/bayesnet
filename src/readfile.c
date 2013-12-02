@@ -6,10 +6,7 @@
 #include <string.h>
 #include <stddef.h> // size_t type definition
 #include <unistd.h> // ssize_t type definition
-
-#define Malloc(type,n) (type *)malloc((n)*sizeof(type))
-
-#define PROG_TAG "READFILE"
+#include <assert.h>
 
 /* Function
  * -------------------
@@ -26,11 +23,9 @@ read_problem(const char *filename, double **x, int *n, int *m)
     size_t len = 0;
     ssize_t read;
 
-    if (fp == NULL)
-    {
-        errlog("read_problem(): couldnt open input file\n");
-        return 1;
-    }
+    _CONFIG_ERROR status = E_SUCCESS;
+
+    assert(fp != NULL);
 
     /* first peek at number of nodes and samples */
     int local_n = 0;
@@ -53,7 +48,7 @@ read_problem(const char *filename, double **x, int *n, int *m)
 
     rewind(fp);
 
-    double *dataset = Malloc(double, local_n*local_m);
+    double *dataset = Calloc(double, local_n*local_m);
 
     /* now write values in file to matrix */
     for (int i = 0; (read = getline(&line, &len, fp)) != -1; ++i)
@@ -78,5 +73,9 @@ read_problem(const char *filename, double **x, int *n, int *m)
     *x = dataset;
 
     fclose(fp);
-    return 0;
+
+    if (dataset == NULL)
+	    status = E_NULL_POINTER;
+
+    return status;
 }

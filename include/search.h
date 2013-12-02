@@ -2,8 +2,9 @@
 #define _SEARCH_H_
 
 #include "node.h"
+#include "main.h"
 
 void
-estimate_dag(double *, NODE *, int, int, int, int, int, int *, int *);
+estimate_dag(PARAMS, int *, int *);
 
 #endif

@@ -1,7 +1,6 @@
 #include "library.h"
 #include "main.h"
 #include "node.h"
-#include "probability.h"
 #include "readfile.h"
 #include "score.h"
 #include "search.h"
@@ -10,276 +9,296 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-#include <syslog.h>
 #include <string.h>
 #include <time.h>
 
-#define PROG_TAG "MAIN"
-
 //TODO remove all redundant libs
-//TODO pass in some of these as parms to the program?
-#define NUM_REPETITIONS 10
-#define Malloc(type,n) (type *)malloc((n)*sizeof(type))
+#define NUM_REPETITIONS 10000
 
-const char filename[1024] = "./data/toy2.txt";
+const char filename[1024] = "./sim16";
 int seed;
 
 // private functions
-int
-populate_nodes(double **, int, int, int);
-void
-init_edges(NODE **, int, int);
-void
-destroy_edges(NODE *, int);
-void
-init_parents(double *, int, NODE *);
-void
-print_dmatrix(double *c, int sizen, int sizem);
-void
-print_imatrix(int *c, int size);
+static void finalize_params(PARAMS params);
+static int init_parents(NODE **, const int, const int);
+static void destroy_parents(NODE *, const int);
+//TODO make double * const * const * ...
+static void populate_candidate_parents(PARAMS, double *);
+static int one_to_one(const PARAMS, double **);
+//static int populate_nodes(double **, int, int, int);
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
-    //TODO X matrix is accessed in (i, j) X[i * n + m]
-    double *X = NULL;           // n x m dataset
-    NODE *Y = NULL;             // parent edges for each node
-    int p = 0;                  // number of nodes
-    int n = 0;                  // number of samples per node
-    int r = 3;                  // number of discrete bins
-    int m = 3;                  // max candidate parent set size
-    int max_parents = 3;        // maximum number of parents per node
+	_CONFIG_ERROR status = E_SUCCESS;
 
-    double *local_scores = NULL;
+	//TODO set these in arguments?
+	PARAMS params = { NULL, NULL, 0, 0, 3, 8, 7 };
+	double *local_scores = NULL;
 
-    // initialize logging
-    openlog(PROG_TAG, 0, LOG_USER);
+	// read in data samples from file and record size of data
+	status = read_problem(filename, &params.X, &params.p, &params.n);
+	// TODO change this later?
+	params.m = params.p;
+	assert(status == E_SUCCESS);
+	assert(params.max_parents < params.p);
+	assert(params.m <= params.p);
 
-    // read in data samples from file and check for possible errors
-    int s = read_problem(filename, &X, &p, &n);
-    //int status = populate_nodes(&X, n, m, categories);
-    assert(s == 0);
-    assert(X != NULL);
-    assert(m < p);
-    assert(max_parents < p);
+	// allocate and initialize parent edges for each node
+	status = init_parents(&params.Y, params.p, params.max_parents);
+	assert(status == E_SUCCESS);
 
-    // allocate and initialize parent edges for each node
-    init_edges(&Y, p, max_parents);
-    assert(Y != NULL);
+	//calculate 1x1 directed edge scores
+	//  (i,j)th element is the local score() of graph gene_j -> gene_i
+	status = one_to_one(params, &local_scores);
+	assert(status == E_SUCCESS);
+	//util_print_dmatrix(local_scores, params.p, params.p);
 
-    /**calculate one to one local scores
-     *  (i,j)th element is the local score() of graph gene_i -> gene_j
-     */
-    one_to_one(X, p, &local_scores, n, r);
-    assert(local_scores != NULL);
+	// find top candidate parents for each node and assign them
+	//populate_candidate_parents(params, local_scores);
 
-    // initialize c and g matrices
-    int *G = Malloc(int, p*p); // adjacency matrix of the network
-    memset(G, 0, sizeof(G[0]) * p * p);
-    int *C = Malloc(int, p*p); // node selection frequency matrix
-    memset(C, 0, sizeof(C[0]) * p * p);
+	// adjacency matrix of the network
+	int *G = Calloc(int, params.p * params.p);
+	// node selection frequency matrix
+	int *C = Calloc(int, params.p * params.p);
 
-    // find top candidate parents for each node and assign them
-    init_parents(local_scores, p, Y);
+	// reflect parents of nodes into the adjacency matrix
+	for (int i = 0; i < params.p; ++i)
+		for (int j = 0; j < params.Y[i].num_parents; ++j)
+			if (params.Y[i].parents[j] != -1)
+				matrix(G, params.p, params.Y[i].parents[j], i) = 1;
 
-    // reflect parents of node into the adjacency matrix
-    for (int i = 0; i < p; ++i)
-        for (int j = 0; j < Y[i].num_parents; ++j)
-            if (Y[i].parents[j] != -1)
-                G[Y[i].parents[j] * p + i] = 1;
+	printf("G matrix after initial candidate parents: \n");
+	util_print_imatrix(G, params.p);
 
-    //TODO no parents with high indeces?
-    //print_imatrix(G,p);
+	/**
+	 * init seed to the time ONLY ONCE at the start -
+	 *  seed is increased by one every time a random number is drawn
+	 *  if the seed is init'd to the time every time, sometimes the time
+	 *  does not update between random number draws
+	 *  TODO remove globals.h
+	 *  TODO think of a way to do this better (include random routines in main?)
+	 *          do seed++ after every call of randinter?
+	 */
+	seed = (int) time(NULL); // init seed only once at the start
 
-    /**
-     * init seed to the time ONLY ONCE at the start -
-     *  seed is increased by one every time a random number is drawn
-     *  if the seed is init'd to the time every time, sometimes the time
-     *  does not update between random number draws
-     *  TODO remove globals.h
-     *  TODO think of a way to do this better (include random routines in main?)
-     *          do seed++ after every call of randinter?
-     */
-    seed = (int) time(NULL); // init seed only once at the start
+	//TODO partition into random sets to run randomly
+	// repeatedly run the HC search & score routine
+	printf("##\nStarting HC routine");
+	for (int i = 0; i < NUM_REPETITIONS; ++i) {
+		if ((i % 1000) == 0) {
+			printf(".");
+			fflush(stdout);
+		}
+		//estimate_dag(X, Y, p, n, max_parents, m, r, G, C);
+		//TODO how does parms struct impose parallellism
+		estimate_dag(params, G, C);
+	}
+	printf("\n\n");
 
-    /**TODO partition into random sets to run randomly
-     * repeatedly run the HC search & score routine
-     */
-//    printf("starting HC routine");
-    for (int i = 0; i < NUM_REPETITIONS; ++i)
-    {
-//        if ((i % 100000) == 0)
-//        {
-//            printf(".");
-//            fflush(stdout);
-//        }
-        estimate_dag(X, Y, p, n, max_parents, m, r, G, C);
-    }
-//    printf("\n\n");
+	//TODO traverse the nodes and pick edges to add to the final graph G based on C
 
-//TODO traverse the nodes and pick edges to add to the final graph G based on C
+	printf("G was: \n");
+	util_print_imatrix(G, params.p);
 
-    printf("G was: \n");
-    print_imatrix(G, p);
+	for (int i = 0; i < params.p; ++i)
+		for (int j = 0; j < params.Y[i].num_parents; ++j)
+			if (G[params.Y[i].parents[j] * params.p + i] != 1)
+				printf("parents dont match adj matrix\n");
 
-    for(int i = 0; i < p; ++i)
-      for(int j = 0; j < Y[i].num_parents; ++j)
-        if (G[Y[i].parents[j] * p + i] != 1) 
-          printf("parents dont match adj matrix\n");
+	free(C);
+	free(G);
+	free(local_scores);
+	finalize_params(params);
 
-    free(X);
-    destroy_edges(Y, p);
-    free(local_scores);
-    free(G);
-    free(C);
+	return status;
+}
 
-//syslog(LOG_INFO, "%s", "exiting cleanly\n");
-    closelog();
-    return 0;
+/*
+##############################################################################*/
+/**
+ * @brief frees up all memory allocated for problem data defined in PARAMS p
+ *
+ * @param p PARAMS struct target
+ */
+/*
+##############################################################################*/
+void finalize_params(PARAMS p)
+{
+	free(p.X);
+	destroy_parents(p.Y, p.p);
+
+	return;
 }
 
 /* ##############################################################################*/
 /**
- * @brief
+ * @brief allocates space for Y; allocates arrays of size max_parents for each 
+ * node in Y and inits values to -1
  *
- * @param X
- * @param n
- * @param m
- * @param c
- *
- * @return
+ * @param Y target array of NODEs to have parent arrays initialized
+ * @param p total number of NODEs in Y
+ * @param max_parents size of parent array to allocate
  */
 /* ##############################################################################*/
-int
-populate_nodes(double **X, int n, int m, int c)
+int init_parents(NODE **Y, const int p, const int max_parents)
 {
-    double *nodes = Malloc(double, n*m);
+	_CONFIG_ERROR status = E_SUCCESS;
+	NODE *a = Calloc(NODE, p);
 
-    for (int i = 0; i < n; ++i)
-    {
-        for (int j = 0; j < m; ++j)
-        {
-            nodes[i * m + j] = get_expression(NULL, 0);
-            printf("%f, ", nodes[i * m + j]);
-        }
-        printf("\n");
-    }
-    *X = nodes;
+	for (int i = 0; i < p; ++i) {
+		a[i].parents = Calloc(int, max_parents);
 
-    return 1;
+		// initialize all parents to -1
+		memset(a[i].parents, -1, sizeof(a[i].parents[0]) * max_parents);
+		a[i].num_parents = 0;
+	}
+
+	*Y = a;
+
+	if (a == NULL)
+		status = E_NULL_POINTER;
+
+	return status;
 }
 
 /* ##############################################################################*/
 /**
- * @brief
+ * @brief frees memory allocated for parent arrays of each NODE
  *
- * @param Y
- * @param n
- * @param max_parents
+ * @param Y target array of NODEs to have parent elements destroyed
+ * @param p total number of NODEs in Y
  */
 /* ##############################################################################*/
-void
-init_edges(NODE **Y, int n, int max_parents)
+void destroy_parents(NODE *Y, const int p)
 {
-    NODE *p = Malloc(NODE, n);
-    for (int i = 0; i < n; ++i)
-    {
-        p[i].parents = Malloc(int, max_parents);
-        // initialize all parents to -1
-        memset(p[i].parents, -1, sizeof(p[i].parents[0]) * max_parents);
-        p[i].num_parents = 0;
-    }
-    *Y = p;
+	for (int i = 0; i < p; ++i)
+		free(Y[i].parents);
+
+	free(Y);
 }
 
 /* ##############################################################################*/
 /**
- * @brief
+ * @brief initialize parent candidate sets based on highest 1x1 scores (assumes parents
+ * are empty)
  *
- * @param Y
- * @param n
+ * @param p struct containing node data
+ * @param local_scores local score matrix (non-NULL)
  */
 /* ##############################################################################*/
-void
-destroy_edges(NODE *Y, int n)
+void populate_candidate_parents(PARAMS p, double *local_scores)
 {
-    for (int i = 0; i < n; ++i)
-        free(Y[i].parents);
-    //g_slist_free(Y[i].parents);
+	// holds highest scoring candidate scores for a node (descending order)
+	double *max_score_buff = Calloc(double, p.max_parents);
+	double score = 0;
+	int parent_slot = -1;
 
-    free(Y);
+	for (int i = 0; i < p.p; ++i) {
+		for (int j = 0; j < p.p; ++j) {
+			if (j == i)
+				continue;
+
+			// (i,j) represents score of i for parent set {j}
+			score = matrix(local_scores, p.p, i, j);
+
+			parent_slot = -1;
+
+			//TODO case of a tie?
+			// see if score is higher than previous j 
+			for (int k = (p.max_parents-1); k >= 0; --k)
+				if (score > max_score_buff[k])
+					parent_slot = k;
+
+			// if a new max score was found
+			if (parent_slot > -1) {
+				// shift up elements above where new number is to be inserted
+				for (int k = (p.max_parents-1); k > parent_slot; --k) {
+					max_score_buff[k] = max_score_buff[k-1];
+					p.Y[i].parents[k] = p.Y[i].parents[k-1];
+				}
+
+				// insert new max score at parent_slot
+				max_score_buff[parent_slot] = score;
+				p.Y[i].parents[parent_slot] = j;
+
+				// if parent set full, do not increase count
+				if (p.Y[i].num_parents < p.max_parents)
+					p.Y[i].num_parents++;
+			}
+		}
+
+		//reset buff to all 0's
+		memset(max_score_buff, 0, sizeof(max_score_buff[0]) * p.max_parents);
+	}
+
+	//TODO invalid size for free() below?
+	free(max_score_buff);
+	return;
 }
 
 /* ##############################################################################*/
 /**
- * @brief
+ * @brief calculate all 1-to-1 (DIRECTED EDGE) scores
  *
- * @param local_scores
- * @param p
- * @param Y
+ * @param p struct containing node data 
+ * @param local_scores 1x1 scores for network (typically NULL)
  */
 /* ##############################################################################*/
-void
-init_parents(double *local_scores, int p, NODE *Y)
+int one_to_one(const PARAMS p, double **local_scores)
 {
-    int max_parents = 3;
-    /**TODO case of score tie? (there could be many ties)
-     * assign best candidate parents to each node
-     */
-    for (int i = 0; i < p; ++i)
-    {
-        //TODO this should be dynamic for max_parents
-        double top[max_parents];
-        memset(top, 0, sizeof(top[0]) * max_parents);
+	_CONFIG_ERROR status = E_SUCCESS;
+	double *scores = Calloc(double, p.p * p.p);
 
-        for (int j = 0; j < p; ++j)
-        {
-            double score = local_scores[i * p + j];
-            int index = -1;
+#pragma omp parallel shared(p.X, p.p, p.n, p.r, scores)
+	{
+		void *buff = bde_init(p.X, p.p, p.n, p.r, 1);
+		//void *buff = BDE_init(X, X, p, n, r, 1); //tamada
+		//double t_start = omp_get_wtime();
 
-            if (score > top[0])
-                index = 0;
-            if (score > top[1])
-                index = 1;
-            if (score > top[2])
-                index = 2;
+#pragma omp for
+		// loop over each possible child-pair edge
+		for (int u = 0; u < p.p; ++u) {
+			for (int v = 0; v < p.p; ++v) {
+				if (u == v)
+					continue;
 
-            if (index > -1)
-            {
-                // shift down elements below where new number is to be inserted
-                for (int k = 0; k <= (index - 1); ++k)
-                {
-                    top[k] = top[k+1];
-                    Y[i].parents[k] = Y[i].parents[k+1];
-                }
-                // insert new max into proper index
-                top[index] = score;
-                Y[i].parents[index] = j;
-                if (Y[i].num_parents < max_parents)
-                    Y[i].num_parents++;
-            }
-        }
-    }
+				double score = get_score(buff, &v, 1);
+				//double score = BDE_score(buff, 0, &v, 1); //tamada
+
+				// mark parent scores {v} for each row u
+				matrix(scores, p.p, u, v)= score;
+			}
+		}
+
+		//printf("local_score :: thread%d time on wall %f\n", omp_get_thread_num(), omp_get_wtime() - t_start);
+		bde_destroy_buff(buff);
+	} // end pragma omp parallel
+
+	*local_scores = scores;
+
+	if (scores == NULL)
+		status = E_NULL_POINTER;
+
+	return status;
 }
 
-void
-print_dmatrix(double *c, int sizen, int sizem)
+//TODO REMOVE
+/*
+int populate_nodes(double **X, int n, int m, int c)
 {
-    for (int i = 0; i < sizen; ++i)
-    {
-        for (int j = 0; j < sizem; ++j)
-            printf("%f, ", c[i * sizem + j]);
-        printf("\n");
-    }
-}
+	double *nodes = Calloc(double, n*m);
+	_CONFIG_ERROR status = E_SUCCESS;
 
-void
-print_imatrix(int *c, int size)
-{
-    for (int i = 0; i < size; ++i)
-    {
-        for (int j = 0; j < size; ++j)
-            printf("%d, ", c[i * size + j]);
-        printf("\n");
-    }
+	for (int i = 0; i < n; ++i) {
+		for (int j = 0; j < m; ++j) {
+			nodes[i * m + j] = get_expression(NULL, 0);
+			printf("%f, ", nodes[i * m + j]);
+		}
+		printf("\n");
+	}
+
+	*X = nodes;
+
+	return status;
 }
+*/
