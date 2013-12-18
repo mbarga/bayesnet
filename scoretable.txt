@@ -1,0 +1,100 @@
+child: 0 =======
+|4|: ===
+parent set {1, 2, 3, 4} -> 222.176951
+|3|: ===
+parent set {1, 2, 3} -> 215.820957
+parent set {4, 1, 2} -> 216.096557
+parent set {3, 4, 1} -> 208.010344
+parent set {2, 3, 4} -> 212.486223
+|2|: ===
+parent set {1, 2} -> 222.635778
+parent set {2, 3} -> 218.134506
+parent set {3, 4} -> 209.756856
+parent set {1, 3} -> 195.011987
+parent set {2, 4} -> 217.660897
+parent set {1, 4} -> 221.516556
+|1|: ===
+parent set {1} -> 220.131064
+parent set {2} -> 218.143739
+parent set {3} -> 216.454328
+parent set {4} -> 226.803447
+child: 4 =======
+|4|: ===
+parent set {0, 1, 2, 3} -> 186.033003
+|3|: ===
+parent set {0, 1, 2} -> 148.110018
+parent set {3, 0, 1} -> 160.051912
+parent set {2, 3, 0} -> 154.514220
+parent set {1, 2, 3} -> 215.820957
+|2|: ===
+parent set {0, 1} -> 72.433437
+parent set {1, 2} -> 222.635778
+parent set {2, 3} -> 218.134506
+parent set {0, 2} -> 99.630218
+parent set {1, 3} -> 195.011987
+parent set {0, 3} -> 125.684823
+|1|: ===
+parent set {0} -> 38.363560
+parent set {1} -> 220.131064
+parent set {2} -> 218.143739
+parent set {3} -> 216.454328
+child: 3 =======
+|4|: ===
+parent set {4, 0, 1, 2} -> 209.593355
+|3|: ===
+parent set {4, 0, 1} -> 172.259892
+parent set {2, 4, 0} -> 176.038179
+parent set {1, 2, 4} -> 219.414293
+parent set {0, 1, 2} -> 148.110018
+|2|: ===
+parent set {4, 0} -> 112.563084
+parent set {0, 1} -> 72.433437
+parent set {1, 2} -> 222.635778
+parent set {4, 1} -> 224.714987
+parent set {0, 2} -> 99.630218
+parent set {4, 2} -> 210.086443
+|1|: ===
+parent set {4} -> 226.803447
+parent set {0} -> 38.363560
+parent set {1} -> 220.131064
+parent set {2} -> 218.143739
+child: 2 =======
+|4|: ===
+parent set {3, 4, 0, 1} -> 209.179022
+|3|: ===
+parent set {3, 4, 0} -> 165.436024
+parent set {1, 3, 4} -> 217.677507
+parent set {0, 1, 3} -> 128.461790
+parent set {4, 0, 1} -> 172.259892
+|2|: ===
+parent set {3, 4} -> 209.756856
+parent set {4, 0} -> 112.563084
+parent set {0, 1} -> 72.433437
+parent set {3, 0} -> 110.276811
+parent set {4, 1} -> 224.714987
+parent set {3, 1} -> 197.915390
+|1|: ===
+parent set {3} -> 216.454328
+parent set {4} -> 226.803447
+parent set {0} -> 38.363560
+parent set {1} -> 220.131064
+child: 1 =======
+|4|: ===
+parent set {2, 3, 4, 0} -> 196.529312
+|3|: ===
+parent set {2, 3, 4} -> 212.486223
+parent set {0, 2, 3} -> 137.323424
+parent set {4, 0, 2} -> 151.908314
+parent set {3, 4, 0} -> 165.436024
+|2|: ===
+parent set {2, 3} -> 218.134506
+parent set {3, 4} -> 209.756856
+parent set {4, 0} -> 112.563084
+parent set {2, 4} -> 217.660897
+parent set {3, 0} -> 110.276811
+parent set {2, 0} -> 89.639259
+|1|: ===
+parent set {2} -> 218.143739
+parent set {3} -> 216.454328
+parent set {4} -> 226.803447
+parent set {0} -> 38.363560

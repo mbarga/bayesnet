@@ -1,7 +1,15 @@
-#include "library.h"
+#include "util.h"
+//#include "score.h"
+#include "BDE.h"
 
 #include <stdlib.h>
 #include <stdio.h>
+
+double get_score(void *buff, int child, int *parents, int size)
+{
+	//return (double)bde_score(buff, parents, size);
+	return (double)BDE_score(buff, child, parents, size);
+}
 
 void
 util_print_dmatrix(double *c, int sizen, int sizem)

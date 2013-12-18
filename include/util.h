@@ -1,5 +1,5 @@
-#ifndef _LIBRARY_H_
-#define _LIBRARY_H_
+#ifndef _UTIL_H_
+#define _UTIL_H_
 
 #define Calloc(type,n) calloc(n, sizeof(type))
 #define matrix(a,dim,a_i,a_j) a[a_i * dim + a_j] // matrix (row,col) -> (a_i,a_j)
@@ -27,11 +27,9 @@ struct _errordesc
 };
 */
 
-void
-util_print_dmatrix(double *, int, int);
-void
-util_print_imatrix(int *, int);
-void
-util_errlog(char *);
+double get_score(void *, int, int *, int);
+void util_print_dmatrix(double *, int, int);
+void util_print_imatrix(int *, int);
+void util_errlog(char *);
 
 #endif

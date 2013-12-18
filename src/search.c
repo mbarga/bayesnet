@@ -30,8 +30,9 @@
 #include "node.h"
 #include "ran2.h"
 #include "globals.h"
-#include "score.h"
-#include "library.h"
+//#include "score.h"
+#include "BDE.h"
+#include "util.h"
 #include "main.h"
 
 #include <stdio.h>
@@ -47,9 +48,9 @@ int seed;
 
 // local functions
 void error_check(int *, int, NODE *, int[]);
-void op_addition(int, void *, NODE, double, double *);
-int op_deletion(int, void *, int, NODE, double, double *);
-int op_reversal(int, int, void *, int, NODE, NODE, double, double *);
+void op_addition(int, int, void *, NODE, double, double *);
+int op_deletion(int, int, void *, NODE, double, double *);
+int op_reversal(int, int, int, void *, NODE, NODE, double, double *);
 void random_permute(int *, int);
 double * max_reduction(double *, double *, double *);
 int apply_action(double[], NODE *, int *, int, int, int[], int);
@@ -92,17 +93,20 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 	NODE *Y = parms.Y;
 	double *X = parms.X;
 
+	// FIXME fix this later?
+	m = p;
+
 	// sample input data
 	//printf("%d %d %d %d %d %d %f\n",p, n, m, r, max_parents, Y[0].num_parents, X[0]);
-
-	// local adjacency matrix
-	int *G_M = Calloc(int, m * m);
 
 	// initialize candidate indices and shuffle them
 	int candidates[p];
 	for (int i = 0; i < p; ++i)
 		candidates[i] = i;
 	random_permute(candidates, p);
+
+	// local adjacency matrix
+	int *G_M = Calloc(int, m * m);
 
 	// initialize local adjacency matrix G_M
 	//TODO is this right?
@@ -117,22 +121,8 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 	}
 	// end pragma omp parallel
 
-	/**TODO write a local C matrix
-	 * c_(u,v) <- c_(u,v) + 1 AND c_(v,u) <- c_(u,v)
-	 *      for all (X_u, X_v) in candidate set
-	 */
-	//    for (int i = 0; i < m; ++i)
-	//        for (int j = i + 1; j < m; ++j)
-	//        {
-	//            u = candidates[i];
-	//            v = candidates[j];
-	//            matrix(C,p,u,v)++;
-	//            matrix(C,p,v,u)++;
-	//            //C[u * p + v]++;
-	//            //C[v * p + u]++;
-	//        }
-	    
-	void *buffer = bde_init(X, p, n, r, m);
+	//void *buffer = bde_init(X, p, n, r, m);
+	void *buffer = BDE_init(X, X, p, n, r, max_parents);
 
 	// repeatedly apply HC on the candidate set until no no_improvement_cnt
 	int i = 0;
@@ -147,8 +137,13 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 		//    printf("%d, ", Y[u].parents[z]);
 		//printf("\n");
 
-		//TODO code this to a memory matrix to hold prev. calculated scores
-		double score = get_score(buffer, Y[u].parents, Y[u].num_parents);
+		//TODO code this to a memory matrix to hold prev. calculated score
+		double score = get_score(buffer, u, Y[u].parents, Y[u].num_parents);
+
+#ifdef DEBUG
+		printf("========================================\n");
+		printf("CURRENT SCORE (of %d, #parents %d): %f\n",u, Y[u].num_parents, score);
+#endif
 
 		// reset all of the operation buffers
 		add_op[0] = TOL;
@@ -166,16 +161,16 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 			// test hill climbing operations
 			// if edge doesnt exist and parent set is not full
 			if ((matrix(G_M,m,k,j)== 0) & (Y[u].num_parents < max_parents)) {
-				op_addition(k, buffer, Y[u], score, add_op);
+				op_addition(k, v, buffer, Y[u], score, add_op);
 			}
 
 			// if edge exists and parent set is not empty
 			//TODO redundant?? edge exists and still check parent set?
 			if ((matrix(G_M,m,k,j)== 1) & (Y[u].num_parents > 0)) {
-				status = op_deletion(k, buffer, v, Y[u], score, del_op);
+				status = op_deletion(k, v, buffer, Y[u], score, del_op);
 
 				if (Y[v].num_parents < max_parents) {
-					status = op_reversal(j, k, buffer, v, Y[u], Y[v], score, rev_op);
+					status = op_reversal(j, k, v, buffer, Y[u], Y[v], score, rev_op);
 				}
 			}
 		}
@@ -185,6 +180,9 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 
 		// no improvement
 		if (action == NULL) {
+#ifdef DEBUG
+			printf("NO ACTION TAKEN\n");
+#endif
 			no_improvement_cnt++;
 		} else if (action[2] != -1) {
 			status = apply_action(action, Y, G_M, max_parents, j, candidates,
@@ -192,8 +190,14 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 			if (status != E_SUCCESS)
 				util_errlog("ERROR IN apply_action()");
 
+#ifdef DEBUG
+			score = get_score(buffer, Y[u].parents, Y[u].num_parents);
+			printf("SCORE AFTER: %f (diff: %f)\n", score, action[0]);
+#endif
+
 			no_improvement_cnt = 0;
 		}
+
 
 		error_check(G_M, m, Y, candidates);
 
@@ -273,16 +277,20 @@ void error_check(int *G_M, int m, NODE *Y, int candidates[])
  * @param max_diff_a[]
  */
 /* ##############################################################################*/
-void op_addition(int k, void *buffer, NODE u, double current_score,
+void op_addition(int k, int v, void *buffer, NODE u, double current_score,
 		double max_diff_a[])
 {
-	u.parents[u.num_parents] = k;
-	double new_score = get_score(buffer, u.parents, u.num_parents + 1);
+	u.parents[u.num_parents] = v;
+	double new_score = get_score(buffer, u.index, u.parents, u.num_parents + 1);
 	u.parents[u.num_parents] = -1;
 
 	double diff = current_score - new_score;
 
 	if (diff > max_diff_a[0]) {
+#ifdef DEBUG
+		printf("diff of %d(%f) > than current diff %f\n",v,diff,max_diff_a[0]);
+#endif
+
 		max_diff_a[0] = diff;
 		max_diff_a[2] = k;
 	}
@@ -301,7 +309,7 @@ void op_addition(int k, void *buffer, NODE u, double current_score,
  * @param max_diff_d[]
  */
 /* ##############################################################################*/
-int op_deletion(int k, void *buffer, int v, NODE u, double current_score,
+int op_deletion(int k, int v, void *buffer, NODE u, double current_score,
 		double max_diff_d[])
 {
 	_CONFIG_ERROR status = E_SUCCESS;
@@ -325,7 +333,7 @@ int op_deletion(int k, void *buffer, int v, NODE u, double current_score,
 	//        printf("%d, ", temp[z]);
 	//    printf("\n");
 
-	double new_score = get_score(buffer, temp, u.num_parents - 1);
+	double new_score = get_score(buffer, u.index, temp, u.num_parents - 1);
 
 	double diff = current_score - new_score;
 
@@ -353,7 +361,7 @@ int op_deletion(int k, void *buffer, int v, NODE u, double current_score,
  * @param max_diff_r[]
  */
 /* ##############################################################################*/
-int op_reversal(int j, int k, void *buffer, int nv, NODE u, NODE v,
+int op_reversal(int j, int k, int nv, void *buffer, NODE u, NODE v,
 		double current_score, double max_diff_r[])
 {
 	_CONFIG_ERROR status = E_SUCCESS;
@@ -378,7 +386,7 @@ int op_reversal(int j, int k, void *buffer, int nv, NODE u, NODE v,
 	//        printf("%d, ", temp[z]);
 	//    printf("\n");
 
-	double new_score_d1 = get_score(buffer, temp, u.num_parents - 1);
+	double new_score_d1 = get_score(buffer, u.index, temp, u.num_parents - 1);
 	double d1 = current_score - new_score_d1;
 
 	v.parents[v.num_parents] = j;
@@ -388,7 +396,7 @@ int op_reversal(int j, int k, void *buffer, int nv, NODE u, NODE v,
 	//        printf("%d, ", temp[z]);
 	//    printf("\n");
 
-	double new_score_d2 = get_score(buffer, v.parents, v.num_parents + 1);
+	double new_score_d2 = get_score(buffer, v.index, v.parents, v.num_parents + 1);
 	v.parents[v.num_parents] = -1;
 	double d2 = current_score - new_score_d2;
 
@@ -434,7 +442,7 @@ void random_permute(int *m, int n)
 }
 
 /* ##############################################################################*/
-/** min()
+/** max_reduction()
  * @brief
  *
  * @param a
@@ -452,10 +460,14 @@ double * max_reduction(double *a, double *b, double *c)
 	if (a[0] > temp) {
 		temp = a[0];
 		action = 1;
-	} if (b[0] > temp) {
+	}
+
+	if (b[0] > temp) {
 		temp = b[0];
 		action = 2;
-	} if (c[0] > temp) {
+	}
+
+	if (c[0] > temp) {
 		temp = c[0];
 		action = 3;
 	}
@@ -499,6 +511,13 @@ int apply_action(double action[3], NODE *Y, int *G_M, int max_parents, int child
 	case 1: // edge addition
 		add_parent(v, &Y[u]);
 		matrix(G_M, m, parent, child) = 1;
+#ifdef DEBUG
+		printf("ADDING PARENT %d to CHILD %d\n",v,u);
+		printf("CHILD parents after: ");
+		for (int z = 0; z < max_parents; ++z)
+			printf("%d, ", Y[u].parents[z]);
+		printf("\n");
+#endif
 		break;
 
 	case 2: // edge removal
@@ -510,10 +529,14 @@ int apply_action(double action[3], NODE *Y, int *G_M, int max_parents, int child
 		if (status == E_SUCCESS)
 			matrix(G_M, m, parent, child) = 0;
 
-		//              printf("CHILD parents after(%d): ", Y[u].num_parents);
-		//              for (int z = 0; z < max_parents; ++z)
-		//                  printf("%d, ", Y[u].parents[z]);
-		//              printf("\n");
+#ifdef DEBUG
+		printf("REMOVING PARENT %d FROM CHILD %d ", v, u);
+		printf("CHILD parents after(%d): ", Y[u].num_parents);
+		for (int z = 0; z < max_parents; ++z)
+			printf("%d, ", Y[u].parents[z]);
+		printf("\n");
+#endif
+
 		break;
 
 	case 3: // edge reversal
@@ -548,6 +571,10 @@ int apply_action(double action[3], NODE *Y, int *G_M, int max_parents, int child
 			//                printf("%d, ", Y[v].parents[z]);
 			//            printf("\n");
 		}
+
+#ifdef DEBUG
+		printf("REVERSING PARENT %d AND CHILD %d\n",v, u);
+#endif
 
 		break;
 	}
