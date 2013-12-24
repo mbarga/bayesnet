@@ -30,7 +30,7 @@
 #include "node.h"
 #include "ran2.h"
 #include "globals.h"
-//#include "score.h"
+#include "score.h"
 #include "BDE.h"
 #include "util.h"
 #include "main.h"
@@ -121,7 +121,7 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 	}
 	// end pragma omp parallel
 
-	//void *buffer = bde_init(X, p, n, r, m);
+	//void *buffer = score_init(X, p, n, r, max_parents);
 	void *buffer = BDE_init(X, X, p, n, r, max_parents);
 
 	// repeatedly apply HC on the candidate set until no no_improvement_cnt
@@ -191,7 +191,7 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 				util_errlog("ERROR IN apply_action()");
 
 #ifdef DEBUG
-			score = get_score(buffer, Y[u].parents, Y[u].num_parents);
+			score = get_score(buffer, u, Y[u].parents, Y[u].num_parents);
 			printf("SCORE AFTER: %f (diff: %f)\n", score, action[0]);
 #endif
 
@@ -204,7 +204,7 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 		++i;
 	} // while improvement
 
-	bde_destroy_buff(buffer);
+	//score_destroy_buff(buffer);
 
 	/**
 	 * reflect changes on G_M back into the global adjacency matrix G
@@ -230,7 +230,7 @@ void error_check(int *G_M, int m, NODE *Y, int candidates[])
 		for (int jj = 0; jj < m; ++jj)
 			if (matrix(G_M,m,jj,ii)== 1) {
 				NODE u = Y[candidates[ii]];
-				NODE v = Y[candidates[jj]];
+				//NODE v = Y[candidates[jj]];
 
 				int g_idx = -1;
 				for(int kk=0; kk < u.num_parents; ++kk)

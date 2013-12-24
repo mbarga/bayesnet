@@ -1,4 +1,5 @@
 #include "score.h"
+#include "util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,13 +7,11 @@
 #include <strings.h>
 #include <math.h>
 
-#define Malloc(type,n) (type *)malloc((n)*sizeof(type))
-
 typedef struct buffer
 {
-	int node_count;	// p
+	int node_count;		// p
 	int sample_count;	// n
-	double *data;	// X
+	double *data;		// X
 	int max_parents;	// m
 
 	int prior;
@@ -25,11 +24,10 @@ typedef struct buffer
 } BUFFER;
 
 // internal function declarations
-int count_nijk(BUFFER*, int*, int);
-double calc_bde(int*, double, int*, int, int, int);
+int count_nijk(BUFFER *, const int *, int, int);
+double calc_bde(int *, double, const int *, int, int, int);
 
-/*
-##############################################################################*/
+/* ##########################################################################*/
 /**
  * @brief 
  *
@@ -41,9 +39,8 @@ double calc_bde(int*, double, int*, int, int, int);
  *
  * @return 
  */
-/*
-##############################################################################*/
-void * bde_init(double *data, int node_count, int sample_count, int categories, int max_parents)
+/* ##########################################################################*/
+void * score_init(double *data, int node_count, int sample_count, int categories, int max_parents)
 {
 	BUFFER *buffer = Malloc(BUFFER, 1);
 
@@ -65,16 +62,15 @@ void * bde_init(double *data, int node_count, int sample_count, int categories, 
 	return buffer;
 }
 
-/*
-##############################################################################*/
+
+/* ##########################################################################*/
 /**
  * @brief 
  *
  * @param buff
  */
-/*
-##############################################################################*/
-void bde_destroy_buff(void * buff)
+/* ##########################################################################*/
+void score_destroy_buff(void * buff)
 {
 	BUFFER * bf = (BUFFER *) buff;
 
@@ -84,27 +80,27 @@ void bde_destroy_buff(void * buff)
 	free(buff);
 }
 
-/*
-##############################################################################*/
+
+/* ##########################################################################*/
 /**
  * @brief 
  *
  * @param buffer
+ * @param child
  * @param parents
  * @param q
  *
  * @return 
  */
-/*
-##############################################################################*/
-double bde_score(void *buffer, int *parents, int q)
+/* ##########################################################################*/
+double score_calc(void *buffer, const int child, const int *parents, const int q)
 {
 	BUFFER *bf = (BUFFER *) buffer;
 
 	/* likelihood */
-	int count = count_nijk(bf, parents, q);
+	int count = count_nijk(bf, parents, q, child);
 
-#ifdef BDE_DEBUG
+#ifdef DEBUG
 	fprintf(stderr, "BDE_score(): count = %d\n", count);
 #endif
 
@@ -117,20 +113,19 @@ double bde_score(void *buffer, int *parents, int q)
 	return score;
 }
 
-/*
-##############################################################################*/
+/* ##########################################################################*/
 /**
  * @brief 
  *
  * @param buff
  * @param parents
  * @param parents_count
+ * @param child
  *
  * @return 
  */
-/*
-##############################################################################*/
-int count_nijk(BUFFER *buff, int *parents, int parents_count)
+/* ##########################################################################*/
+int count_nijk(BUFFER *buff, const int *parents, int parents_count, int child)
 {
 	int n_ij_count = 0;
 
@@ -176,18 +171,14 @@ int count_nijk(BUFFER *buff, int *parents, int parents_count)
 					sizeof(int) * buff->multinomial);
 		}
 
-		//TODO is this correct? buff->data[i + j(as in r[j]) * samplecount]
-		int xi = (int) buff->data[i];
-		//TODO remove
-		//printf("reading index %d spots for n_ijk\n", xi+s*buff->multinomial);
+		int xi = (int) buff->data[i + child * buff->sample_count];
 		buff->n_ijk[xi + s * buff->multinomial]++;
 	}
 
 	return n_ij_count;
 }
 
-/*
-##############################################################################*/
+/* ##########################################################################*/
 /**
  * @brief 
  *
@@ -200,9 +191,8 @@ int count_nijk(BUFFER *buff, int *parents, int parents_count)
  *
  * @return 
  */
-/*
-##############################################################################*/
-double calc_bde(int* n_ijk, double fixed_alpha, int* parents, int q, int count, int categories)
+/* ##########################################################################*/
+double calc_bde(int *n_ijk, double fixed_alpha, const int *parents, int q, int count, int categories)
 {
 	double score = 0.0;
 

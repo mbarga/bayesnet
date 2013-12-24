@@ -2,8 +2,8 @@
 #define _SCORE_H_
 
 //TODO use of CONST INTS
-void * 	bde_init(double*, int, int, int, int);
-void    bde_destroy_buff(void *);
-double 	bde_score(void*, int*, int);
+void *	score_init(double*, int, int, int, int);
+void    score_destroy_buff(void *);
+double	score_calc(void *, const int, const int *, const int);
 
 #endif

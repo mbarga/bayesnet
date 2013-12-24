@@ -2,7 +2,10 @@
 #define _UTIL_H_
 
 #define Calloc(type,n) calloc(n, sizeof(type))
+#define Malloc(type,n) (type *)malloc((n)*sizeof(type))
 #define matrix(a,dim,a_i,a_j) a[a_i * dim + a_j] // matrix (row,col) -> (a_i,a_j)
+
+#define INF 999999999 //TODO rewrite this
 
 typedef enum _config_error
 {
@@ -31,5 +34,6 @@ double get_score(void *, int, int *, int);
 void util_print_dmatrix(double *, int, int);
 void util_print_imatrix(int *, int);
 void util_errlog(char *);
+void util_print_score_table(void *);
 
 #endif
