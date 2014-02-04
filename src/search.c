@@ -67,10 +67,24 @@ int remove_parent(int, int, NODE *);
  */
 /* ##############################################################################*/
 //void estimate_dag(double *X, NODE *Y, int p, int n, int max_parents, int m, int r,
-void estimate_dag(PARAMS parms, int *G, int *C)
+void estimate_dag(PARAMS parms, int *G)
 {
 	_CONFIG_ERROR status = E_SUCCESS;
 
+// READ ONLY DATA
+	// make local copies of data used from PARAMS due to multiple threads
+	// running this routine
+	const int p = parms.p;
+	const int n = parms.n;
+	const int m = parms.p; // FIXME clean this up later?
+	const int r = parms.r;
+	const int max_parents = parms.max_parents;
+	double *X = parms.X;
+
+// WRITE ONCE DATA
+	NODE *Y = parms.Y;
+
+// NEED PRIVATE COPIES OF THIS DATA 
 	// {delta score, action, candidate parent index}
 	double add_op[3] = { TOL, 1, -1 };
 	double del_op[3] = { TOL, 2, -1 };
@@ -83,18 +97,6 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 
 	int no_improvement_cnt = 0; //
 
-	// make local copies of data used from PARAMS due to multiple threads
-	// running this routine
-	int p = parms.p;
-	int n = parms.n;
-	int m = parms.m;
-	int r = parms.r;
-	int max_parents = parms.max_parents;
-	NODE *Y = parms.Y;
-	double *X = parms.X;
-
-	// FIXME fix this later?
-	m = p;
 
 	// sample input data
 	//printf("%d %d %d %d %d %d %f\n",p, n, m, r, max_parents, Y[0].num_parents, X[0]);
@@ -107,6 +109,7 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 
 	// local adjacency matrix
 	int *G_M = Calloc(int, m * m);
+// END PRIVATE COPIES
 
 	// initialize local adjacency matrix G_M
 	//TODO is this right?
@@ -119,7 +122,7 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 			matrix(G_M, m, k, j) = matrix(G, p, v, u);
 		}
 	}
-	// end pragma omp parallel
+// end pragma omp parallel
 
 	//void *buffer = score_init(X, p, n, r, max_parents);
 	void *buffer = BDE_init(X, X, p, n, r, max_parents);
@@ -218,7 +221,7 @@ void estimate_dag(PARAMS parms, int *G, int *C)
 			matrix(G,p,v,u)= matrix(G_M,m,jj,ii);
 		}
 	// end parallel
-
+	
 	free(G_M);
 	//TODO return G_M and C_
 }
@@ -419,20 +422,17 @@ int op_reversal(int j, int k, int nv, void *buffer, NODE u, NODE v,
  * @param n
  */
 /* ##############################################################################*/
-void random_permute(int *m, int n)
-{
+void random_permute(int *m, int n) {
 	//srandinter((int)time(NULL));
 	srandinter(seed++);
 
-	if (m == NULL)
-	{
+	if (m == NULL) {
 		util_errlog("random_permute(): m was found NULL\n");
 		return;
 	}
 
 	int j = 0, t = 0;
-	for (int i = 0; i < n; ++i)
-	{
+	for (int i = 0; i < n; ++i) {
 		//j = rand() % (n - i) + i;
 		j = randinter(0, n);
 		t = m[j];
@@ -452,8 +452,7 @@ void random_permute(int *m, int n)
  * @return
  */
 /* ##############################################################################*/
-double * max_reduction(double *a, double *b, double *c)
-{
+double * max_reduction(double *a, double *b, double *c) {
 	double temp = TOL;
 	char action = 0;
 
@@ -498,8 +497,7 @@ double * max_reduction(double *a, double *b, double *c)
  */
 /* ##############################################################################*/
 int apply_action(double action[3], NODE *Y, int *G_M, int max_parents, int child,
-		int candidates[], int m)
-{
+		int candidates[], int m) {
 	_CONFIG_ERROR status = E_SUCCESS;
 
 	int parent = action[2];

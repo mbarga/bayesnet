@@ -4,15 +4,14 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <syslog.h>
 
-double get_score(void *buff, int child, int *parents, int size)
-{
+double get_score(void *buff, int child, int *parents, int size) {
 	//return (double)score_calc(buff, child, parents, size);
 	return (double)BDE_score(buff, child, parents, size);
 }
 
-void util_print_dmatrix(double *c, int sizen, int sizem)
-{
+void util_print_dmatrix(double *c, int sizen, int sizem) {
 	for (int i = 0; i < sizen; ++i) {
 		for (int j = 0; j < sizem; ++j)
 			printf("%f, ", c[i * sizem + j]);
@@ -20,8 +19,7 @@ void util_print_dmatrix(double *c, int sizen, int sizem)
 	}
 }
 
-void util_print_imatrix(int *c, int size)
-{
+void util_print_imatrix(int *c, int size) {
 	for (int i = 0; i < size; ++i) {
 		for (int j = 0; j < size; ++j)
 			printf("%d, ", c[i * size + j]);
@@ -29,14 +27,16 @@ void util_print_imatrix(int *c, int size)
 	}
 }
 
-void util_errlog(char *s)
-{
-	fprintf(stderr, "%s", s);
-	//syslog(LOG_INFO, "%s", "randperm(): m was found NULL\n");
+void util_errlog(char *s) {
+	syslog(LOG_PERROR, "%s\n", s);
+	//fprintf(stderr, "%s", s);
 }
 
-void util_print_score_table(void *buff)
-{
+void util_debuglog(char *s) {
+	syslog(LOG_INFO, "%s\n", s);
+}
+
+void util_print_score_table(void *buff) {
 	int parents[5] = {0,1,2,3,4};
 	int four[4] = {0,0,0,0};
 	int three[3] = {0,0,0};

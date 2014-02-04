@@ -5,6 +5,6 @@
 #include "main.h"
 
 void
-estimate_dag(PARAMS, int *, int *);
+estimate_dag(PARAMS, int *);
 
 #endif

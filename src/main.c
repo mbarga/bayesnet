@@ -9,12 +9,14 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <syslog.h>
 #include <assert.h>
 #include <string.h>
 #include <time.h>
 
 //TODO remove all redundant libs
 #define NUM_REPETITIONS 10
+#define PROG_TAG "BAYES_HC"
 
 const char filename[1024] = "./5sim";
 int seed;
@@ -31,6 +33,10 @@ static int one_to_one(const PARAMS, double **);
 int main(int argc, char *argv[])
 {
 	_CONFIG_ERROR status = E_SUCCESS;
+
+	// initialize logging
+	//setlogmask (LOG_UPTO (LOG_NOTICE));
+	openlog(PROG_TAG, 0, LOG_USER);
 
 	//TODO set these in arguments?
 	PARAMS params = { NULL, NULL, 0, 0, 3, 0, 3 }; // X, Y, p, n, r, m, max_parents
@@ -55,18 +61,16 @@ int main(int argc, char *argv[])
 	double *local_scores = NULL;
 	status = one_to_one(params, &local_scores);
 	assert(status == E_SUCCESS);
-	util_print_dmatrix(local_scores, params.p, params.p);
+	//util_print_dmatrix(local_scores, params.p, params.p);
 
 	// find top candidate parents for each node and assign them
 	// TODO update this to choose lowest scoring parents
-	populate_candidate_parents(params.Y, params.p, local_scores);
+	//populate_candidate_parents(params.Y, params.p, local_scores);
 
 	// adjacency matrix of the network
 	int *G = Calloc(int, params.p * params.p);
-	// node selection frequency matrix
-	int *C = Calloc(int, params.p * params.p);
 
-	// reflect parents of nodes into the adjacency matrixS
+	// reflect parents of nodes into the adjacency matrix
 	for (int i = 0; i < params.p; ++i)
 		for (int j = 0; j < params.Y[i].num_parents; ++j)
 			if (params.Y[i].parents[j] != -1)
@@ -74,7 +78,7 @@ int main(int argc, char *argv[])
 
 	printf("G matrix after initial candidate parents: \n");
 	util_print_imatrix(G, params.p);
-	printf("\n\n");
+	printf("\n");
 
 #ifdef DEBUG
 	//void *buff = score_init(params.X, params.p, params.n, params.r, params.max_parents);
@@ -106,25 +110,21 @@ int main(int argc, char *argv[])
 		*/
 		//estimate_dag(X, Y, p, n, max_parents, m, r, G, C);
 		//TODO how does parms struct impose parallellism
-		estimate_dag(params, G, C);
+		estimate_dag(params, G);
 	}
-	printf("\n\n");
-
-	//TODO traverse the nodes and pick edges to add to the final graph G based on C
-
-	printf("G was: \n");
+	printf("\n---- FINAL OUTPUT GRAPH -> G[] ----\n");
 	util_print_imatrix(G, params.p);
 
 	for (int i = 0; i < params.p; ++i)
 		for (int j = 0; j < params.Y[i].num_parents; ++j)
 			if (G[params.Y[i].parents[j] * params.p + i] != 1)
-				printf("parents dont match adj matrix\n");
-
-	free(C);
+				util_errlog("PARENTS DONT MATCH ADJ MATRIX");
+	
 	free(G);
 	free(local_scores);
 	finalize_params(params);
 
+	closelog();
 	return status;
 }
 
@@ -262,9 +262,9 @@ void populate_candidate_parents(NODE *Y, const int p, double *local_scores)
 		}
 
 		if (min_parent > -1) {
-			printf("ADDING CANDIDATE\n");
+			printf("ADDING CANDIDATE: ");
 			Y->parents[0] = min_parent;
-			printf("Y[0] is: %d",Y->parents[0]);
+			printf("Y[0] is: %d\n",Y->parents[0]);
 		}
 
 		//reset buff to all 0's
