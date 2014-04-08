@@ -12,19 +12,37 @@ double get_score(void *buff, int child, int *parents, int size) {
 }
 
 void util_print_dmatrix(double *c, int sizen, int sizem) {
+	FILE *f = fopen("./data/output.txt", "w");
+	if (f == NULL) {
+		printf("Error opening file\n");
+		exit(1);
+	}
+
 	for (int i = 0; i < sizen; ++i) {
 		for (int j = 0; j < sizem; ++j)
-			printf("%f, ", c[i * sizem + j]);
-		printf("\n");
+			//printf("%f, ", c[i * sizem + j]);
+			fprintf(f, "%f, ", c[i * sizem + j]);
+		fprintf(f, "\n");
 	}
+	fclose(f);
 }
 
 void util_print_imatrix(int *c, int size) {
-	for (int i = 0; i < size; ++i) {
-		for (int j = 0; j < size; ++j)
-			printf("%d, ", c[i * size + j]);
-		printf("\n");
+	FILE *f = fopen("./data/output.txt", "w");
+	if (f == NULL) {
+		printf("Error opening file\n");
+		exit(1);
 	}
+
+	for (int i = 0; i < size; ++i) {
+		for (int j = 0; j < size; ++j) {
+			fprintf(f, "%d", c[i * size + j]);
+			if (j < (size-1))
+				fprintf(f, ",");
+		}
+		fprintf(f, "\n");
+	}
+	fclose(f);
 }
 
 void util_errlog(char *s) {

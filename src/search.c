@@ -39,10 +39,13 @@
 #include <stdlib.h>
 #include <omp.h>
 #include <string.h>
+#include <assert.h>
+#include <syslog.h>
 
 // local constants
 #define TOL 0.0001
 #define MAX_ITER 40
+#define NTHREADS 4
 
 int seed;
 
@@ -71,9 +74,8 @@ void estimate_dag(PARAMS parms, int *G)
 {
 	_CONFIG_ERROR status = E_SUCCESS;
 
-// READ ONLY DATA
-	// make local copies of data used from PARAMS due to multiple threads
-	// running this routine
+	// READ ONLY DATA ##########################################################
+	// make local copies of data used from PARAMS
 	const int p = parms.p;
 	const int n = parms.n;
 	const int m = parms.p; // FIXME clean this up later?
@@ -81,57 +83,96 @@ void estimate_dag(PARAMS parms, int *G)
 	const int max_parents = parms.max_parents;
 	double *X = parms.X;
 
-// WRITE ONCE DATA
-	NODE *Y = parms.Y;
+	// initialize candidate lookup indices and shuffle them
+	int candidates[p];
+	for (int l=0; l<p; ++l)
+		candidates[l] = l;
+	random_permute(candidates, p);
 
-// NEED PRIVATE COPIES OF THIS DATA 
-	// {delta score, action, candidate parent index}
-	double add_op[3] = { TOL, 1, -1 };
-	double del_op[3] = { TOL, 2, -1 };
-	double rev_op[3] = { TOL, 3, -1 };
-
+	// WRITE MULTIPLE ###########################################################
 	int u = -1; // child node index in global adjacency matrix G
 	int j = -1; // child node index in local adjacency matrix G_M
 	int v = -1; // parent node index in global adjacency matrix G
 	int k = -1; // parent node index in local adjacency matrix G_M
 
-	int no_improvement_cnt = 0; //
+	int no_improvement_cnt = 0;
 
-
-	// sample input data
-	//printf("%d %d %d %d %d %d %f\n",p, n, m, r, max_parents, Y[0].num_parents, X[0]);
-
-	// initialize candidate indices and shuffle them
-	int candidates[p];
-	for (int i = 0; i < p; ++i)
-		candidates[i] = i;
-	random_permute(candidates, p);
-
-	// local adjacency matrix
-	int *G_M = Calloc(int, m * m);
-// END PRIVATE COPIES
+	NODE *Y = parms.Y;	       // list of parent nodes
+	int *G_M = Calloc(int, m * m); // local adjacency matrix
 
 	// initialize local adjacency matrix G_M
-	//TODO is this right?
-#pragma omp parallel shared(G_M, p) private(u,v)
-#pragma omp for
-	for (j = 0; j < m; ++j) {
-		for (k = 0; k < m; ++k) {
+	#pragma omp parallel for shared(G_M) private(u,v)
+	for (int j = 0; j < m; ++j) {
+		for (int k = 0; k < m; ++k) {
 			u = candidates[j];
 			v = candidates[k];
 			matrix(G_M, m, k, j) = matrix(G, p, v, u);
 		}
 	}
-// end pragma omp parallel
 
-	//void *buffer = score_init(X, p, n, r, max_parents);
-	void *buffer = BDE_init(X, X, p, n, r, max_parents);
+#ifdef PAR
+	double	*queue[NTHREADS];
+	//*queue = Calloc(double*, NTHREADS)
+	void	*buffers[NTHREADS];
+	for (int l = 0; l < NTHREADS; ++l)
+		buffers[l] = BDE_init(X, X, p, n, r, max_parents);
+#else
+	void *buff = BDE_init(X, X, p, n, r, max_parents);
+#endif
 
-	// repeatedly apply HC on the candidate set until no no_improvement_cnt
+	// ######## begin procedure #################################################
+	// sample input data
+	//printf("%d %d %d %d %d %d %f\n",p, n, m, r, max_parents, Y[0].num_parents, X[0]);
+
+	/*
+	 * repeatedly apply HC on the candidate set until no no_improvement_cnt
+	 */
 	int i = 0;
-	while ((no_improvement_cnt < max_parents) && (i < MAX_ITER)) {
+	//while (i < MAX_ITER) {
+	while ((no_improvement_cnt < (max_parents*3) && (i < MAX_ITER))) {
+		#pragma omp parallel \
+		     firstprivate(no_improvement_cnt), \
+		     private(u, j, v, k) \
+		     shared(X, Y, candidates, queue, buffers)
+		{
+		void *buffer;
+		double score;
+
+		// {delta score, action, candidate parent index, child index}
+		double add_op[4] = { TOL, 1, -1, -1 };
+		double del_op[4] = { TOL, 2, -1, -1 };
+		double rev_op[4] = { TOL, 3, -1, -1 };
+
+#ifdef PAR
+		const int tid = omp_get_thread_num();
+
+		buffer = buffers[tid];
+
 		// chooses candidate at random from candidate set
+		//TODO this is not evenly distributed
+		//TODO error check rand within bounds
+		//TODO fix the random generator
+		int rand = -1;
+		while (!(rand >= 0 && rand <= m/NTHREADS)) {
+			if (tid < (m % NTHREADS))
+				rand = (int)randinter(0, (m/NTHREADS));
+			else
+				rand = (int)randinter(0, (m/NTHREADS - 1));
+		}
+		//assert(rand >= 0 && rand <= m/NTHREADS);
+		j = NTHREADS * rand + tid;
+		//TODO remove this check
+		if (!(j >= 0 && j <= 1000) || !(rand >= 0 && rand < m/NTHREADS)) {
+			syslog(LOG_INFO, "rand:%d, m/N:%d, tid:%d, j:%d\n", rand, (m/NTHREADS-1), tid, j);
+		}
+		//assert(j >= 0 && j < m);
+		//if (tid > 0 && j > 990) printf("TID WAS %d, j: %d\n", tid, j);
+
+#else // FALLBACK SERIAL CASE
+		buffer = buff;
 		j = randinter(0, m);
+#endif
+
 		u = candidates[j];
 
 		// initial score of candidate
@@ -141,12 +182,16 @@ void estimate_dag(PARAMS parms, int *G)
 		//printf("\n");
 
 		//TODO code this to a memory matrix to hold prev. calculated score
-		double score = get_score(buffer, u, Y[u].parents, Y[u].num_parents);
+		syslog(LOG_INFO, "u is: %d, j is: %d; GETTING SCORE:", u, j);
+		//printf("buffer: %p, %p\n", buffer, buffers[tid]);
+		score = get_score(buffer, u, Y[u].parents, Y[u].num_parents);
+		syslog(LOG_INFO, " %f\n", score);
 
-#ifdef DEBUG
+		#ifdef DEBUG
 		printf("========================================\n");
-		printf("CURRENT SCORE (of %d, #parents %d): %f\n",u, Y[u].num_parents, score);
-#endif
+		printf("CURRENT SCORE (of %d, #parents %d): \
+			%f\n",u, Y[u].num_parents, score);
+		#endif
 
 		// reset all of the operation buffers
 		add_op[0] = TOL;
@@ -158,72 +203,98 @@ void estimate_dag(PARAMS parms, int *G)
 
 		for (k = 0; k < m; ++k) {
 			v = candidates[k];
+
 			if (u == v)
 				continue;
 
 			// test hill climbing operations
 			// if edge doesnt exist and parent set is not full
-			if ((matrix(G_M,m,k,j)== 0) & (Y[u].num_parents < max_parents)) {
+			if ((matrix(G_M,m,k,j) == 0) && \
+			   (Y[u].num_parents < max_parents))
 				op_addition(k, v, buffer, Y[u], score, add_op);
-			}
 
 			// if edge exists and parent set is not empty
 			//TODO redundant?? edge exists and still check parent set?
-			if ((matrix(G_M,m,k,j)== 1) & (Y[u].num_parents > 0)) {
+			if ((matrix(G_M,m,k,j) == 1) && \
+			   (Y[u].num_parents > 0))
+			{
 				status = op_deletion(k, v, buffer, Y[u], score, del_op);
 
-				if (Y[v].num_parents < max_parents) {
+				if (Y[v].num_parents < max_parents)
 					status = op_reversal(j, k, v, buffer, Y[u], Y[v], score, rev_op);
-				}
 			}
 		}
 
 		// choose max of three operations and apply the corresponding action to the graph
 		double *action = max_reduction(add_op, del_op, rev_op);
 
-		// no improvement
+		// queue or apply the action that was chosen
 		if (action == NULL) {
-#ifdef DEBUG
+			#ifdef DEBUG
 			printf("NO ACTION TAKEN\n");
-#endif
+			#endif
 			no_improvement_cnt++;
 		} else if (action[2] != -1) {
-			status = apply_action(action, Y, G_M, max_parents, j, candidates,
-					m);
+#ifdef PAR
+			//printf("TID was %d, CHILD: %d\n", tid, j);
+			action[3] = j;
+			queue[tid] = action;
+#else
+			status = apply_action(action, Y, G_M, max_parents, j, candidates, m);
 			if (status != E_SUCCESS)
 				util_errlog("ERROR IN apply_action()");
+#endif
 
-#ifdef DEBUG
+			#ifdef DEBUG
 			score = get_score(buffer, u, Y[u].parents, Y[u].num_parents);
 			printf("SCORE AFTER: %f (diff: %f)\n", score, action[0]);
-#endif
+			#endif
 
 			no_improvement_cnt = 0;
 		}
+		} // end omp parallel
 
+#ifdef PAR
+		//printf("number of threads: %d\n", NTHREADS);
+		//TODO check for redundant or conflicting thread action choices?
+		for(int l=0; l<NTHREADS; ++l) {
+			if (queue[l] == NULL) {
+				no_improvement_cnt++;
+			} else if (queue[l][2] != -1) {
+				//printf("idx: %d, :ITEMS %f, %f, %f, child: %f\n", h, queue[h][0], queue[h][1], queue[h][2], queue[h][3]);
+				status = apply_action(queue[l], Y, G_M, max_parents, queue[l][3], candidates, m);
+				if (status != E_SUCCESS)
+					util_errlog("ERROR IN apply_action()");
+			}
+		}
+#endif
 
-		error_check(G_M, m, Y, candidates);
-
+		/* END OF LOOP PREP */
+		//error_check(G_M, m, Y, candidates);
 		++i;
 	} // while improvement
 
-	//score_destroy_buff(buffer);
+#ifdef PAR
+	for (int l = 0; l < NTHREADS; ++l) {
+		BDE_finalize(buffers[l]);
+	}
+#else
+	BDE_finalize(buff);
+#endif
 
 	/**
 	 * reflect changes on G_M back into the global adjacency matrix G
 	 */
-#pragma omp parallel shared(G_M, p) private(u,v)
-#pragma omp for
+	#pragma omp parallel for shared(G_M) private(u,v)
 	for (int ii = 0; ii < m; ++ii)
 		for (int jj = 0; jj < m; ++jj) {
 			u = candidates[ii];
 			v = candidates[jj];
-			matrix(G,p,v,u)= matrix(G_M,m,jj,ii);
+			matrix(G,p,v,u) = matrix(G_M,m,jj,ii);
 		}
-	// end parallel
-	
+
 	free(G_M);
-	//TODO return G_M and C_
+	//TODO return G_M and C
 }
 
 void error_check(int *G_M, int m, NODE *Y, int candidates[])

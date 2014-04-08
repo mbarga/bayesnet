@@ -15,10 +15,10 @@
 #include <time.h>
 
 //TODO remove all redundant libs
-#define NUM_REPETITIONS 10
+#define NUM_REPETITIONS 40
 #define PROG_TAG "BAYES_HC"
 
-const char filename[1024] = "./5sim";
+const char filename[1024] = "./data/1000sim";
 int seed;
 
 // private functions
@@ -76,9 +76,9 @@ int main(int argc, char *argv[])
 			if (params.Y[i].parents[j] != -1)
 				matrix(G, params.p, params.Y[i].parents[j], i) = 1;
 
-	printf("G matrix after initial candidate parents: \n");
-	util_print_imatrix(G, params.p);
-	printf("\n");
+	//printf("G matrix after initial candidate parents: \n");
+	//util_print_imatrix(G, params.p);
+	//printf("\n");
 
 #ifdef DEBUG
 	//void *buff = score_init(params.X, params.p, params.n, params.r, params.max_parents);
@@ -103,28 +103,29 @@ int main(int argc, char *argv[])
 	//printf("##\nStarting HC routine");
 	for (int i = 0; i < NUM_REPETITIONS; ++i) {
 		/*
-		   if ((i % 1000) == 0) {
-		   	printf(".");
-		   	fflush(stdout);
-		   }
+		if ((i % 10) == 0) {
+			printf(".");
+			fflush(stdout);
+		}
 		*/
 		//estimate_dag(X, Y, p, n, max_parents, m, r, G, C);
 		//TODO how does parms struct impose parallellism
 		estimate_dag(params, G);
 	}
-	printf("\n---- FINAL OUTPUT GRAPH -> G[] ----\n");
+	//printf("\n---- FINAL OUTPUT GRAPH -> G[] ----\n");
 	util_print_imatrix(G, params.p);
 
 	for (int i = 0; i < params.p; ++i)
 		for (int j = 0; j < params.Y[i].num_parents; ++j)
 			if (G[params.Y[i].parents[j] * params.p + i] != 1)
 				util_errlog("PARENTS DONT MATCH ADJ MATRIX");
-	
+
 	free(G);
 	free(local_scores);
 	finalize_params(params);
 
 	closelog();
+	util_debuglog("\nEXITING NORMALLY========\n");
 	return status;
 }
 
@@ -289,13 +290,13 @@ int one_to_one(const PARAMS p, double **local_scores)
 	_CONFIG_ERROR status = E_SUCCESS;
 	double *scores = Calloc(double, p.p * p.p);
 
-#pragma omp parallel shared(p.X, p.p, p.n, p.r, scores)
+//#pragma omp parallel shared(p.X, p.p, p.n, p.r, scores)
 	{
 		//void *buff = score_init(p.X, p.p, p.n, p.r, 1);
 		void *buff = BDE_init(p.X, p.X, p.p, p.n, p.r, 1); //TODO remove tamada
 		//double t_start = omp_get_wtime();
 
-#pragma omp for
+//#pragma omp for
 		// loop over each possible child-pair edge
 		for (int u = 0; u < p.p; ++u) {
 			for (int v = 0; v < p.p; ++v) {

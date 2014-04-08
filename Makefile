@@ -1,12 +1,13 @@
 DEBUG ?= 1
 ifeq ($(DEBUG), 1)
-	CFLAGS = -g3 -gdwarf2 -DDEBUG -I./include -Wall -O
+	CFLAGS = -g3 -gdwarf2 -DDEBUG -DNPAR -I./include -Wall -O
 	#CFLAGS = $(shell pkg-config --cflags glib-2.0 gtk+-2.0) -g3 -gdwarf2 -DDEBUG -I./include -Wall -O
+	OMPCFLAGS = -fopenmp -std=c99 -g3 -DDEBUG -DPAR -I./include -Wall -O
 else
-	CFLAGS = -DNDEBUG -I./include -Wall -O3 -Wno-unknown-pragmas
+	CFLAGS = -DNDEBUG -DNPAR -I./include -Wall -O3 -Wno-unknown-pragmas
 	#CFLAGS = $(shell pkg-config --cflags glib-2.0 gtk+-2.0) -DNDEBUG -I./include -Wall -O3
+	OMPCFLAGS = -DNDEBUG -DPAR -fopenmp -std=c99 -g -I./include -Wall -O0
 endif
-OMPCFLAGS = -fopenmp -std=c99 -g -I./include -Wall -O
 
 CC = clang $(CFLAGS)
 OMPCC = gcc $(OMPCFLAGS)
@@ -21,7 +22,7 @@ main:
 	$(CC) ./src/readfile.c ./src/BDE.c ./src/ran2.c ./src/util.c ./src/probability.c ./src/score.c ./src/search.c ./src/main.c -o ./bin/hc $(LDFLAGS)
 omp:
 	$(OMPCC) ./src/readfile.c ./src/BDE.c ./src/ran2.c ./src/util.c ./src/probability.c ./src/score.c ./src/search.c ./src/main.c -o ./bin/hc $(LDFLAGS)
-	@echo "### OMP THREAD COUNT: ${OMP_NUM_THREADS}"
+	@echo "### OMP THREAD COUNT: ${OMP_NUM_THREADS} ###"
 score:
 	$(CC) ./src/score.c ./src/test/bdetest.c -o ./bin/bdetest $(LDFLAGS)
 prob:
