@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 	openlog(PROG_TAG, 0, LOG_USER);
 
 	//TODO set these in arguments?
-	PARAMS params = { NULL, NULL, 0, 0, 3, 0, 3 }; // X, Y, p, n, r, m, max_parents
+	PARAMS params = {NULL, NULL, 0, 0, 3, 0, 7}; // X, Y, p, n, r, m, max_parents
 
 	// read in data samples from file and record size of data
 	status = read_problem(filename, &params.X, &params.p, &params.n);
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 
 	//TODO partition into random sets to run randomly
 	// repeatedly run the HC search & score routine
-	//printf("##\nStarting HC routine");
+	printf("\n## Starting HC routine\n");
 	for (int i = 0; i < NUM_REPETITIONS; ++i) {
 		/*
 		if ((i % 10) == 0) {
@@ -108,8 +108,6 @@ int main(int argc, char *argv[])
 			fflush(stdout);
 		}
 		*/
-		//estimate_dag(X, Y, p, n, max_parents, m, r, G, C);
-		//TODO how does parms struct impose parallellism
 		estimate_dag(params, G);
 	}
 	//printf("\n---- FINAL OUTPUT GRAPH -> G[] ----\n");
@@ -125,7 +123,7 @@ int main(int argc, char *argv[])
 	finalize_params(params);
 
 	closelog();
-	util_debuglog("\nEXITING NORMALLY========\n");
+	printf("\n## Exiting Normally\n");
 	return status;
 }
 

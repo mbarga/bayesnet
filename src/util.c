@@ -149,5 +149,4 @@ void util_print_score_table(void *buff) {
 		for(int j = 4; j > 0; --j) parents[j] = parents[j-1];
 		parents[0] = temp;
 	}
-
 }
