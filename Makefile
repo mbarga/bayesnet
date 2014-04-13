@@ -6,14 +6,15 @@ ifeq ($(DEBUG), 1)
 else
 	CFLAGS = -DNDEBUG -DNPAR -I./include -Wall -O3 -Wno-unknown-pragmas
 	#CFLAGS = $(shell pkg-config --cflags glib-2.0 gtk+-2.0) -DNDEBUG -I./include -Wall -O3
+	#CFLAGS = -g -I./include -Wall -O3 -std=c11 -pedantic
 	OMPCFLAGS = -DNDEBUG -DPAR -fopenmp -std=c99 -g -I./include -Wall -O0
 endif
+
+LDFLAGS = $(shell pkg-config --libs glib-2.0 gtk+-2.0) -lm -lprofiler
 
 CC = clang $(CFLAGS)
 OMPCC = gcc $(OMPCFLAGS)
 
-LDFLAGS = $(shell pkg-config --libs glib-2.0 gtk+-2.0) -lm -lprofiler
-#CFLAGS = -g -I./include -Wall -O3 -std=c11 -pedantic  
 OMP_NUM_THREADS=4
 
 all: main

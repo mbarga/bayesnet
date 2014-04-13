@@ -15,10 +15,10 @@
 #include <time.h>
 
 //TODO remove all redundant libs
-#define NUM_REPETITIONS 40
+#define NUM_REPETITIONS 100
 #define PROG_TAG "BAYES_HC"
 
-const char filename[1024] = "./data/1000sim";
+//const char filename[1024] = "./data/sim";
 int seed;
 
 // private functions
@@ -32,6 +32,8 @@ static int one_to_one(const PARAMS, double **);
 
 int main(int argc, char *argv[])
 {
+	const char *filename = argv[1];
+	const char *outfile = argv[2];
 	_CONFIG_ERROR status = E_SUCCESS;
 
 	// initialize logging
@@ -39,11 +41,11 @@ int main(int argc, char *argv[])
 	openlog(PROG_TAG, 0, LOG_USER);
 
 	//TODO set these in arguments?
-	PARAMS params = {NULL, NULL, 0, 0, 3, 0, 7}; // X, Y, p, n, r, m, max_parents
+	PARAMS params = {NULL, NULL, 0, 0, 3, 10, 5}; // X, Y, p, n, r, m, max_parents
 
 	// read in data samples from file and record size of data
 	status = read_problem(filename, &params.X, &params.p, &params.n);
-	params.m = params.p; // TODO change this later?
+	//params.m = params.p; // TODO change this later?
 	assert(status == E_SUCCESS);
 	assert(params.max_parents < params.p);
 	assert(params.m <= params.p);
@@ -111,7 +113,7 @@ int main(int argc, char *argv[])
 		estimate_dag(params, G);
 	}
 	//printf("\n---- FINAL OUTPUT GRAPH -> G[] ----\n");
-	util_print_imatrix(G, params.p);
+	util_print_imatrix(G, params.p, outfile);
 
 	for (int i = 0; i < params.p; ++i)
 		for (int j = 0; j < params.Y[i].num_parents; ++j)

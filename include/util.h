@@ -32,7 +32,7 @@ struct _errordesc
 
 double get_score(void *, int, int *, int);
 void util_print_dmatrix(double *, int, int);
-void util_print_imatrix(int *, int);
+void util_print_imatrix(int *, int, const char *);
 void util_debuglog(char *);
 void util_errlog(char *);
 void util_print_score_table(void *);

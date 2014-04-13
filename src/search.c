@@ -101,7 +101,7 @@ void estimate_dag(PARAMS parms, int *G)
 	int *G_M = Calloc(int, m * m); // local adjacency matrix
 
 	// initialize local adjacency matrix G_M
-	#pragma omp parallel for shared(G_M) private(u,v)
+	//#pragma omp parallel for shared(G_M) private(u,v)
 	for (int j = 0; j < m; ++j) {
 		for (int k = 0; k < m; ++k) {
 			u = candidates[j];
@@ -154,26 +154,30 @@ void estimate_dag(PARAMS parms, int *G)
 		//TODO fix the random generator
 		int rand = -1;
 		while (!(rand >= 0 && rand <= m/NTHREADS)) {
-			if (tid < (m % NTHREADS))
-				rand = (int)randinter(0, (m/NTHREADS));
-			else
-				rand = (int)randinter(0, (m/NTHREADS - 1));
+			if (tid < (m % NTHREADS)) {
+				rand = (int)randinter(0, (m/NTHREADS + 0.5));
+				//printf("tid was %d, rand was %d MNTHR was %d\n", tid, rand, m/NTHREADS);
+			} else {
+				rand = (int)randinter(0, ((m/NTHREADS + 0.5) - 1));
+				//printf("tid was %d, rand was %d MNTHR was %d\n", tid, rand, m/NTHREADS);
+			}
 		}
 		//assert(rand >= 0 && rand <= m/NTHREADS);
 		j = NTHREADS * rand + tid;
 		//TODO remove this check
-		if (!(j >= 0 && j <= 1000) || !(rand >= 0 && rand < m/NTHREADS)) {
-			syslog(LOG_INFO, "rand:%d, m/N:%d, tid:%d, j:%d\n", rand, (m/NTHREADS-1), tid, j);
-		}
+		if (!(rand >= 0 && rand < (m/NTHREADS+0.5)))
+			syslog(LOG_INFO, "rand:%d, m/N:%d, tid:%d\n", rand, (m/NTHREADS+0.5), tid);
 		//assert(j >= 0 && j < m);
 		//if (tid > 0 && j > 990) printf("TID WAS %d, j: %d\n", tid, j);
 
 #else // FALLBACK SERIAL CASE
 		buffer = buff;
-		j = randinter(0, m);
+		j = randinter(0, (m + 0.99));
 #endif
 
 		u = candidates[j];
+		if (!(j >= 0 && j <= p) || !(u >= 0 && u <= p))
+			syslog(LOG_INFO, "u is: %d, j is: %d; GETTING SCORE:", u, j);
 
 		// initial score of candidate
 		//printf("Y[%d] parents(cnt:%d) were: ", u, Y[u].num_parents);
@@ -182,10 +186,10 @@ void estimate_dag(PARAMS parms, int *G)
 		//printf("\n");
 
 		//TODO code this to a memory matrix to hold prev. calculated score
-		syslog(LOG_INFO, "u is: %d, j is: %d; GETTING SCORE:", u, j);
+		//syslog(LOG_INFO, "u is: %d, j is: %d; GETTING SCORE:", u, j);
 		//printf("buffer: %p, %p\n", buffer, buffers[tid]);
 		score = get_score(buffer, u, Y[u].parents, Y[u].num_parents);
-		syslog(LOG_INFO, " %f\n", score);
+		//syslog(LOG_INFO, " %f\n", score);
 
 		#ifdef DEBUG
 		printf("========================================\n");
@@ -257,6 +261,7 @@ void estimate_dag(PARAMS parms, int *G)
 #ifdef PAR
 		//printf("number of threads: %d\n", NTHREADS);
 		//TODO check for redundant or conflicting thread action choices?
+		//TODO sort by score first
 		for(int l=0; l<NTHREADS; ++l) {
 			if (queue[l] == NULL) {
 				no_improvement_cnt++;
@@ -285,7 +290,7 @@ void estimate_dag(PARAMS parms, int *G)
 	/**
 	 * reflect changes on G_M back into the global adjacency matrix G
 	 */
-	#pragma omp parallel for shared(G_M) private(u,v)
+	//#pragma omp parallel for shared(G_M) private(u,v)
 	for (int ii = 0; ii < m; ++ii)
 		for (int jj = 0; jj < m; ++jj) {
 			u = candidates[ii];

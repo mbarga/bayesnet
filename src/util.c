@@ -27,8 +27,8 @@ void util_print_dmatrix(double *c, int sizen, int sizem) {
 	fclose(f);
 }
 
-void util_print_imatrix(int *c, int size) {
-	FILE *f = fopen("./data/output.txt", "w");
+void util_print_imatrix(int *c, int size, const char *filename) {
+	FILE *f = fopen(filename, "w");
 	if (f == NULL) {
 		printf("Error opening file\n");
 		exit(1);
