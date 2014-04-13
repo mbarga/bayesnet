@@ -114,10 +114,14 @@ void estimate_dag(PARAMS parms, int *G)
 	double	*queue[NTHREADS];
 	//*queue = Calloc(double*, NTHREADS)
 	void	*buffers[NTHREADS];
-	for (int l = 0; l < NTHREADS; ++l)
+	int	*temp_parents[NTHREADS];
+	for (int l = 0; l < NTHREADS; ++l) {
 		buffers[l] = BDE_init(X, X, p, n, r, max_parents);
+		temp_parents[l] = Calloc(int, max_parents);
+	}
 #else
-	void *buff = BDE_init(X, X, p, n, r, max_parents);
+	void	*buff = BDE_init(X, X, p, n, r, max_parents);
+	int	*temp_parents = Calloc(int, max_parents);
 #endif
 
 	// ######## begin procedure #################################################
@@ -282,9 +286,11 @@ void estimate_dag(PARAMS parms, int *G)
 #ifdef PAR
 	for (int l = 0; l < NTHREADS; ++l) {
 		BDE_finalize(buffers[l]);
+		free(temp_parents[l]);
 	}
 #else
 	BDE_finalize(buff);
+	free(temp_parents);
 #endif
 
 	/**
