@@ -1,8 +1,13 @@
 /.cproject
+src/.cproject
 /.project
+src/.project
 /.settings
 /Debug
+/scripts
+/data
 /notes
+/old
 /valkyrie
 /probtest
 /bin

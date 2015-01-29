@@ -32,6 +32,7 @@ typedef struct
 
 	int * n_ij; /* working area */
 	int * n_ijk; /* working area */
+	int * j;
 
 	double fixed_alpha; /* fixed alpha parameter */
 
@@ -76,6 +77,7 @@ BDE_init(double * X, double * Y, int p, int n, int c, int m)
 	bf->Y = Y;
 
 	bf->max_parents = m;
+	bf->j = (int*)calloc(m, sizeof(int));
 	bf->verbose = -1;
 
 	if (bf->verbose >= 0)
@@ -207,9 +209,9 @@ BDE_count_n_ijk(BDEBuff * bf, const int * parents, int q, int i)
 	for (int l = 0; l < bf->n; l++)
 	{
 		/* j[m] : parent stat vector */
-		int j[q];
+		//int j[q];
 		for (int m = 0; m < q; m++)  {
-			j[m] = bf->X[l + parents[m] * bf->n];
+			bf->j[m] = bf->X[l + parents[m] * bf->n];
 		}
 
 		/* Find 'stat vector' from n_ij */
@@ -220,7 +222,7 @@ BDE_count_n_ijk(BDEBuff * bf, const int * parents, int q, int i)
 			int flag2 = 0;
 			for (int ii = 0; ii < q; ii++)
 			{
-				if (j[ii] != vec[ii])
+				if (bf->j[ii] != vec[ii])
 				{
 					flag2 = -1;
 					break;
@@ -235,7 +237,7 @@ BDE_count_n_ijk(BDEBuff * bf, const int * parents, int q, int i)
 		if (s == n_ij_count)
 		{
 			/* Not found.  Creats a new element */
-			memcpy(bf->n_ij + s * bf->max_parents, j, sizeof(int) * q);
+			memcpy(bf->n_ij + s * bf->max_parents, bf->j, sizeof(int) * q);
 			n_ij_count++;
 
 			bzero(bf->n_ijk + s * bf->r[i], sizeof(int) * bf->r[i]);

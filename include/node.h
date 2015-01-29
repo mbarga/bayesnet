@@ -8,9 +8,10 @@ typedef struct node
 	//int expression;     // C {-1, 0, 1} expression level of gene
 
 	//GSList* parents;
-	int index;    
+	int index;
 	int *parents;
 	int num_parents;
+	double score;
 } NODE;
 
 #endif

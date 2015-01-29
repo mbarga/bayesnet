@@ -13,21 +13,26 @@
 #include <assert.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 
 //TODO remove all redundant libs
-#define NUM_REPETITIONS 100
+#define NUM_REPETITIONS 3
 #define PROG_TAG "BAYES_HC"
 
 //const char filename[1024] = "./data/sim";
 int seed;
+clock_t begin;
+clock_t end;
+double time_spent;
+struct timeval t1, t2;
 
 // private functions
-static void finalize_params(PARAMS params);
-static int init_parents(NODE **, const int, const int);
-static void destroy_parents(NODE *, const int);
+static void	finalize_params(PARAMS params);
+static int	init_parents(NODE **, const int, const int);
+static void	destroy_parents(NODE *, const int);
 //TODO make double * const * const * ...
-static void populate_candidate_parents(NODE *, const int, double *);
-static int one_to_one(const PARAMS, double **);
+static void	populate_candidate_parents(NODE *, const int, double *);
+static int	one_to_one(const PARAMS, double **);
 //static int populate_nodes(double **, int, int, int);
 
 int main(int argc, char *argv[])
@@ -41,18 +46,19 @@ int main(int argc, char *argv[])
 	openlog(PROG_TAG, 0, LOG_USER);
 
 	//TODO set these in arguments?
-	PARAMS params = {NULL, NULL, 0, 0, 3, 10, 5}; // X, Y, p, n, r, m, max_parents
+	PARAMS params = {NULL, NULL, 0, 0, 3, 20, 5}; // X, Y, p, n, r, m, max_parents
+	//printf("%d %d %d %d %d %d %f\n",p, n, m, r, max_parents, Y[0].num_parents, X[0]);
 
 	// read in data samples from file and record size of data
 	status = read_problem(filename, &params.X, &params.p, &params.n);
-	//params.m = params.p; // TODO change this later?
+	params.m = params.p; //params.p/4; // TODO change this later?
 	assert(status == E_SUCCESS);
 	assert(params.max_parents < params.p);
 	assert(params.m <= params.p);
 
-#ifdef DEBUG
+	#ifdef DEBUG
 	printf("%d nodes, %d samples, %d categories, %d max candidate parents, %d max parents\n", params.p, params.n, params.r, params.m, params.max_parents);
-#endif
+	#endif
 
 	// allocate and initialize parent edges for each node
 	status = init_parents(&params.Y, params.p, params.max_parents);
@@ -73,21 +79,29 @@ int main(int argc, char *argv[])
 	int *G = Calloc(int, params.p * params.p);
 
 	// reflect parents of nodes into the adjacency matrix
-	for (int i = 0; i < params.p; ++i)
-		for (int j = 0; j < params.Y[i].num_parents; ++j)
-			if (params.Y[i].parents[j] != -1)
+	for (int i = 0; i < params.p; ++i) {
+		for (int j = 0; j < params.Y[i].num_parents; ++j) {
+			if (params.Y[i].parents[j] != -1) {
 				matrix(G, params.p, params.Y[i].parents[j], i) = 1;
+			}
+		}
+	}
 
 	//printf("G matrix after initial candidate parents: \n");
 	//util_print_imatrix(G, params.p);
 	//printf("\n");
 
-#ifdef DEBUG
 	//void *buff = score_init(params.X, params.p, params.n, params.r, params.max_parents);
 	void *buff = BDE_init(params.X, params.X, params.p, params.n, params.r, params.max_parents);
-	util_print_score_table(buff);
-	//score_destroy_buff(buff);
-#endif
+	//util_print_score_table(buff);
+	double sum = 0;
+	for (int i = 0; i < params.p; ++i) {
+		int dummy = 0;
+		params.Y[i].score = get_score(buff, i, &dummy, 0);
+		sum += params.Y[i].score;
+	}
+	printf("INITIAL SCORE WAS: %f \n", sum);
+	//BDE_finalize(buff);
 
 	/**
 	 * init seed to the time ONLY ONCE at the start -
@@ -102,7 +116,12 @@ int main(int argc, char *argv[])
 
 	//TODO partition into random sets to run randomly
 	// repeatedly run the HC search & score routine
-	printf("\n## Starting HC routine\n");
+	int iters = 0;
+	int sum_iters = 0;
+	printf("\n## Starting HC routine ##\n");
+	util_debuglog("########### STARTING NEW ROUTINE ###########");
+	gettimeofday(&t1,0);
+	begin = clock();
 	for (int i = 0; i < NUM_REPETITIONS; ++i) {
 		/*
 		if ((i % 10) == 0) {
@@ -110,22 +129,50 @@ int main(int argc, char *argv[])
 			fflush(stdout);
 		}
 		*/
-		estimate_dag(params, G);
+		estimate_dag(params, G, &iters);
+		sum_iters += iters;
+		iters = 0;
 	}
+	end = clock();
+	gettimeofday(&t2,0);
+	double wtime = t2.tv_sec+t2.tv_usec/1e6-(t1.tv_sec+t1.tv_usec/1e6);
+	time_spent = (double)(end-begin)/CLOCKS_PER_SEC;
+	printf("**TOTAL CPU TIME SPENT: %f **\n",time_spent);
+	printf("**TOTAL ELAPSED TIME: %f **\n",wtime);
+	printf("**NUMBER OF ITERATIONS %d **\n", sum_iters);
+
+	double net_score = 0;
+	for (int i = 0; i < params.p; ++i) {
+		net_score += params.Y[i].score;
+	}
+	printf("**NETWORK SCORE WAS: %f **\n", net_score);
+
 	//printf("\n---- FINAL OUTPUT GRAPH -> G[] ----\n");
 	util_print_imatrix(G, params.p, outfile);
 
-	for (int i = 0; i < params.p; ++i)
-		for (int j = 0; j < params.Y[i].num_parents; ++j)
-			if (G[params.Y[i].parents[j] * params.p + i] != 1)
-				util_errlog("PARENTS DONT MATCH ADJ MATRIX");
+	int num_errors = 0;
+	for (int i = 0; i < params.p; ++i) {
+		for (int j = 0; j < params.Y[i].num_parents; ++j) {
+			int jj = params.Y[i].parents[j];
+			//if (G[params.Y[i].parents[j] * params.p + i] != 1) {
+			if (matrix(G, params.p, jj, i) != 1) {
+				num_errors++;
+				syslog(LOG_PERROR, "*** parent %d, child %d\n",jj,i);
+			}
+		}
+	}
+
+	if (num_errors > 0) {
+		syslog(LOG_PERROR, "**%d** PARENTS DONT MATCH IN ADJACENCY MATRIX",
+				num_errors);
+	}
 
 	free(G);
 	free(local_scores);
 	finalize_params(params);
 
 	closelog();
-	printf("\n## Exiting Normally\n");
+	printf("## Exiting Normally    ##\n\n");
 	return status;
 }
 

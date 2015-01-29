@@ -1,3 +1,5 @@
+#define _GNU_SOURCE // prevents implicit getline() error on compilation
+
 #include "readfile.h"
 #include "util.h"
 
